@@ -184,7 +184,18 @@ export function loadStoredAnkiSettings(): AnkiSettings {
       saveStoredAnkiSettings(DEFAULT_ANKI_SETTINGS);
       return DEFAULT_ANKI_SETTINGS;
     }
-    return { ...DEFAULT_ANKI_SETTINGS, ...JSON.parse(raw) };
+    const parsed = JSON.parse(raw);
+    const settings: AnkiSettings = { ...DEFAULT_ANKI_SETTINGS, ...parsed };
+    // Automatically sanitize away any previously saved Cloze models ("Задание с пропусками")
+    if (
+      settings.modelName &&
+      (settings.modelName.toLowerCase().includes("пропуск") ||
+        settings.modelName.toLowerCase().includes("cloze"))
+    ) {
+      settings.modelName = "Основная";
+      saveStoredAnkiSettings(settings);
+    }
+    return settings;
   } catch (err) {
     console.error("Error loading settings from localStorage:", err);
     return DEFAULT_ANKI_SETTINGS;

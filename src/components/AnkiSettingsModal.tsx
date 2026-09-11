@@ -15,6 +15,7 @@ import {
   getAnkiModels,
   testAnkiConnection,
   resetAnkiModelCache,
+  isClozeModel,
 } from "../services/ankiConnect";
 
 interface AnkiSettingsModalProps {
@@ -86,6 +87,22 @@ export const AnkiSettingsModal: React.FC<AnkiSettingsModalProps> = ({
       const models = await getAnkiModels(formData);
       if (models && models.length > 0) {
         setAvailableModels(models);
+
+        // If current model is not found, empty, or is a Cloze model (which breaks front/back vocab cards),
+        // automatically switch to standard non-cloze model ("Основная" or "Basic")
+        if (!models.includes(formData.modelName) || isClozeModel(formData.modelName)) {
+          const nonCloze = models.filter((m) => !isClozeModel(m));
+          const best =
+            nonCloze.find((m) => m === "Основная") ||
+            nonCloze.find((m) => m.toLowerCase() === "basic") ||
+            nonCloze.find((m) => m.startsWith("Основная")) ||
+            nonCloze.find((m) => m.toLowerCase().includes("основн")) ||
+            nonCloze[0] ||
+            models[0];
+          if (best) {
+            setFormData((prev) => ({ ...prev, modelName: best }));
+          }
+        }
       }
     } catch (err) {
       console.warn("Could not fetch decks/models", err);
@@ -232,29 +249,77 @@ export const AnkiSettingsModal: React.FC<AnkiSettingsModalProps> = ({
 
           {/* Model / Note Type */}
           <div className="space-y-1.5">
-            <label className="font-semibold text-slate-700 dark:text-slate-300">
-              Тип карточки (Модель заметки):
-            </label>
+            <div className="flex items-center justify-between">
+              <label className="font-semibold text-slate-700 dark:text-slate-300">
+                Тип карточки (Модель заметки):
+              </label>
+              {availableModels.length > 0 && (
+                <span className="text-[11px] text-slate-400">
+                  Рекомендуется: «Основная» или «Basic»
+                </span>
+              )}
+            </div>
+
             {availableModels.length > 0 ? (
               <select
                 value={formData.modelName}
                 onChange={(e) => setFormData({ ...formData, modelName: e.target.value })}
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
               >
-                {availableModels.map((model) => (
-                  <option key={model} value={model}>
-                    {model}
-                  </option>
-                ))}
+                {availableModels.map((model) => {
+                  const isCloze = isClozeModel(model);
+                  const isRecommended =
+                    model === "Основная" ||
+                    model.toLowerCase() === "basic" ||
+                    (model.startsWith("Основная") && !isCloze);
+
+                  let label = model;
+                  if (isRecommended) label = `⭐ ${model} (Рекомендуется)`;
+                  else if (isCloze) label = `⚠️ ${model} (Для тестов с пропусками, не для слов)`;
+
+                  return (
+                    <option key={model} value={model}>
+                      {label}
+                    </option>
+                  );
+                })}
               </select>
             ) : (
               <input
                 type="text"
                 value={formData.modelName}
                 onChange={(e) => setFormData({ ...formData, modelName: e.target.value })}
-                placeholder="Basic"
+                placeholder="Основная (или Basic)"
                 className="w-full px-3 py-2 rounded-xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-900 dark:text-white text-xs"
               />
+            )}
+
+            {/* Warning if Cloze model is selected */}
+            {isClozeModel(formData.modelName) && (
+              <div className="p-3 bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-xl text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
+                <div className="font-semibold flex items-center gap-1.5">
+                  <AlertCircle className="w-4 h-4 text-amber-600 shrink-0" />
+                  <span>Внимание: выбрано «Задание с пропусками»</span>
+                </div>
+                <p className="text-[11px] leading-relaxed">
+                  Модель с пропусками требует специальной разметки <code className="bg-amber-100 dark:bg-amber-900/60 px-1 py-0.5 rounded text-[10px]">{"{{c1::...}}"}</code>. Для словарных карточек со словом и переводом Anki покажет сообщение: <em>«Задание с пропусками 1 не найдено в карточке»</em>.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nonCloze = availableModels.filter((m) => !isClozeModel(m));
+                    const best =
+                      nonCloze.find((m) => m === "Основная") ||
+                      nonCloze.find((m) => m.toLowerCase() === "basic") ||
+                      nonCloze[0] ||
+                      "Основная";
+                    setFormData({ ...formData, modelName: best });
+                  }}
+                  className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-semibold"
+                >
+                  Переключить на стандартную модель «Основная»
+                </button>
+              </div>
             )}
           </div>
 

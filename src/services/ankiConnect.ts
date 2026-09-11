@@ -177,9 +177,26 @@ export async function ensureDeckExists(settings: AnkiSettings, deckName: string)
 }
 
 /**
+ * Check if a model is a Cloze (Fill-in-the-blank) type.
+ * Cloze models require {{c1::...}} markers and will fail with "Задание с пропусками 1 не найдено"
+ * if used for standard front/back vocabulary cards.
+ */
+export function isClozeModel(name: string): boolean {
+  if (!name) return false;
+  const s = name.trim().toLowerCase();
+  return (
+    s.includes("пропуск") ||
+    s.includes("cloze") ||
+    s.includes("lücke") ||
+    s.includes("texte à trous")
+  );
+}
+
+/**
  * Automatically detects the best available Anki Note Model and Field Names.
  * Seamlessly handles English Anki ("Basic" -> "Front", "Back")
  * and Russian Anki ("Основная" -> "Лицевая сторона", "Оборотная сторона").
+ * Strictly avoids Cloze models ("Задание с пропусками") for standard word-translation cards.
  */
 export async function detectAnkiModelAndFields(settings: AnkiSettings): Promise<{
   modelName: string;
@@ -200,17 +217,26 @@ export async function detectAnkiModelAndFields(settings: AnkiSettings): Promise<
       };
     }
 
-    // 1. Check if user-specified model exists
-    let chosenModel = models.find((m) => m === settings.modelName);
+    // Filter out Cloze models ("Задание с пропусками") because vocabulary cards have front and back
+    const nonClozeModels = models.filter((m) => !isClozeModel(m));
+    const candidatePool = nonClozeModels.length > 0 ? nonClozeModels : models;
 
-    // 2. If not, look for Russian standard "Основная" or English standard "Basic"
+    // 1. Check if user-specified model exists and is NOT cloze
+    let chosenModel: string | undefined;
+    if (settings.modelName && !isClozeModel(settings.modelName)) {
+      chosenModel = candidatePool.find((m) => m === settings.modelName);
+    }
+
+    // 2. If not found or user had a Cloze model configured, find standard Russian or English basic model
     if (!chosenModel) {
       chosenModel =
-        models.find((m) => m === "Основная") ||
-        models.find((m) => m.toLowerCase() === "basic") ||
-        models.find((m) => m.includes("Основная")) ||
-        models.find((m) => m.toLowerCase().includes("basic")) ||
-        models[0];
+        candidatePool.find((m) => m === "Основная") ||
+        candidatePool.find((m) => m.toLowerCase() === "basic") ||
+        candidatePool.find((m) => m.startsWith("Основная")) ||
+        candidatePool.find((m) => m.toLowerCase().startsWith("basic")) ||
+        candidatePool.find((m) => m.toLowerCase().includes("основн")) ||
+        candidatePool.find((m) => m.toLowerCase().includes("basic")) ||
+        candidatePool[0];
     }
 
     // 3. Query field names for the selected model
@@ -224,12 +250,16 @@ export async function detectAnkiModelAndFields(settings: AnkiSettings): Promise<
     if (fields && fields.length >= 2) {
       // Find suitable front field
       const frontCandidates = [
-        "Front",
-        "Лицевая сторона",
-        "Вопрос",
-        "Question",
-        "Text",
-        "Front text",
+        "лицевая сторона",
+        "лицевая",
+        "front",
+        "вопрос",
+        "question",
+        "слово",
+        "word",
+        "term",
+        "text",
+        "front text",
       ];
       const matchedFront = fields.find((f) =>
         frontCandidates.some((c) => c.toLowerCase() === f.toLowerCase())
@@ -238,12 +268,16 @@ export async function detectAnkiModelAndFields(settings: AnkiSettings): Promise<
 
       // Find suitable back field
       const backCandidates = [
-        "Back",
-        "Оборотная сторона",
-        "Ответ",
-        "Answer",
-        "Extra",
-        "Back text",
+        "оборотная сторона",
+        "оборотная",
+        "back",
+        "ответ",
+        "answer",
+        "перевод",
+        "translation",
+        "meaning",
+        "extra",
+        "back text",
       ];
       const matchedBack = fields.find(
         (f) => f !== front && backCandidates.some((c) => c.toLowerCase() === f.toLowerCase())
@@ -263,7 +297,7 @@ export async function detectAnkiModelAndFields(settings: AnkiSettings): Promise<
   } catch (err) {
     console.warn("Could not auto-detect Anki model/fields, falling back:", err);
     return {
-      modelName: settings.modelName || "Basic",
+      modelName: settings.modelName && !isClozeModel(settings.modelName) ? settings.modelName : "Basic",
       frontField: settings.frontField || "Front",
       backField: settings.backField || "Back",
     };

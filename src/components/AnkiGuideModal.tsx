@@ -224,6 +224,28 @@ export const AnkiGuideModal: React.FC<AnkiGuideModalProps> = ({
                 5
               </span>
               <h4 className="font-bold text-slate-900 dark:text-white">
+                Ошибка: «Задание с пропусками 1 не найдено в карточке»
+              </h4>
+            </div>
+            <div className="pl-8 space-y-1.5 text-slate-600 dark:text-slate-300 text-xs">
+              <p>
+                Если Anki при повторении карточки показывает эту надпись, значит карточка была случайно добавлена через модель заметки <em>«Задание с пропусками»</em> (Cloze) вместо <em>«Основная»</em>:
+              </p>
+              <ol className="list-decimal pl-4 space-y-1 text-slate-700 dark:text-slate-300">
+                <li>В меню Anki нажмите <strong>Инструменты → Пустые карточки... → Удалить</strong>, чтобы стереть пустую карточку.</li>
+                <li>В приложении в настройках Anki выберите тип карточки <strong>«Основная»</strong> (или <strong>«Basic»</strong>). Приложение также выбирает её автоматически.</li>
+                <li>Все новые карточки будут создаваться с полным оформлением «Слово — Перевод»!</li>
+              </ol>
+            </div>
+          </div>
+
+          {/* Step 6 */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                6
+              </span>
+              <h4 className="font-bold text-slate-900 dark:text-white">
                 Быстрые клавиши
               </h4>
             </div>
