@@ -168,6 +168,34 @@ export const AnkiGuideModal: React.FC<AnkiGuideModalProps> = ({
                 3
               </span>
               <h4 className="font-bold text-slate-900 dark:text-white">
+                Работа через Vercel (HTTPS)
+              </h4>
+            </div>
+            <div className="pl-8 space-y-2 text-slate-600 dark:text-slate-300">
+              <p>
+                Если вы открыли сайт на Vercel (<code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-xs">https://...vercel.app</code>), современные браузеры по умолчанию блокируют обращение защищенного сайта к локальному Anki на вашем компьютере (<code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded text-xs">http://127.0.0.1:8765</code>).
+              </p>
+              <div className="p-3 bg-indigo-50/70 dark:bg-indigo-950/40 rounded-xl border border-indigo-200/60 dark:border-indigo-900/60 space-y-1.5 text-xs">
+                <div className="font-semibold text-indigo-950 dark:text-indigo-200">
+                  Как разрешить браузеру передавать карточки в Anki:
+                </div>
+                <ol className="list-decimal pl-4 space-y-1 text-slate-700 dark:text-slate-300">
+                  <li>Нажмите на значок замочка / настроек сайта слева от адреса в строке браузера.</li>
+                  <li>Выберите <strong>«Настройки сайтов» (Site settings)</strong>.</li>
+                  <li>Найдите параметр <strong>«Небезопасный контент» (Insecure content)</strong> и переключите на <strong>«Разрешить» (Allow)</strong>.</li>
+                  <li>Обновите страницу — теперь слова будут добавляться напрямую в Anki!</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 4 */}
+          <div className="space-y-2">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                4
+              </span>
+              <h4 className="font-bold text-slate-900 dark:text-white">
                 Использование с телефона (Смартфон / Мобильный доступ)
               </h4>
             </div>
@@ -189,11 +217,11 @@ export const AnkiGuideModal: React.FC<AnkiGuideModalProps> = ({
             </div>
           </div>
 
-          {/* Step 4 */}
+          {/* Step 5 */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <span className="w-6 h-6 rounded-full bg-indigo-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
-                4
+                5
               </span>
               <h4 className="font-bold text-slate-900 dark:text-white">
                 Быстрые клавиши

@@ -5,82 +5,129 @@ export interface AnkiResponse<T = any> {
   error: string | null;
 }
 
+// In-memory cache for auto-detected model & field names to avoid extra roundtrips
+let cachedModelInfo: {
+  modelName: string;
+  frontField: string;
+  backField: string;
+} | null = null;
+
+/**
+ * Reset detected model cache (e.g. after settings change or error)
+ */
+export function resetAnkiModelCache(): void {
+  cachedModelInfo = null;
+}
+
 /**
  * Execute an AnkiConnect action.
- * First tries direct browser fetch to the specified URL (usually http://127.0.0.1:8765).
- * If direct fetch fails (due to mixed content or CORS) and useProxy is enabled, falls back to server-side proxy /api/ankiconnect/proxy.
+ * Directly sends JSON-RPC to user's local AnkiConnect (http://127.0.0.1:8765).
+ * Accurately surfaces Anki errors without masking them behind a proxy 404.
  */
 export async function invokeAnkiConnect<T = any>(
   settings: AnkiSettings,
   action: string,
   params: Record<string, any> = {}
 ): Promise<T> {
+  const ankiUrl = (settings.url || "http://127.0.0.1:8765").trim();
   const payload = {
     action,
     version: 6,
     params,
   };
 
-  // 1. Try direct client-side fetch first if not forced to proxy
-  if (!settings.useProxy) {
-    try {
-      const response = await fetch(settings.url, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
+  let directNetworkError: any = null;
 
-      if (response.ok) {
-        const data: AnkiResponse<T> = await response.json();
-        if (data.error) {
-          throw new Error(`AnkiConnect ошибка: ${data.error}`);
-        }
-        return data.result;
-      }
-    } catch (directErr: any) {
-      console.warn("Прямое подключение к AnkiConnect не удалось, пробуем прокси:", directErr.message);
-      // Fall through to try server proxy
-    }
-  }
-
-  // 2. Try server-side proxy
+  // 1. Direct browser fetch to AnkiConnect
   try {
-    const proxyResponse = await fetch("/api/ankiconnect/proxy", {
+    const response = await fetch(ankiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify({
-        endpoint: settings.url,
-        action,
-        params,
-        version: 6,
-      }),
+      body: JSON.stringify(payload),
     });
 
-    if (!proxyResponse.ok) {
-      const errData = await proxyResponse.json().catch(() => ({}));
-      throw new Error(errData.message || errData.error || `HTTP ${proxyResponse.status}`);
+    if (response.ok) {
+      const data: AnkiResponse<T> = await response.json();
+      if (data.error) {
+        // This is a business error from AnkiConnect itself (e.g. "model was not found", "deck was not found")
+        // NEVER fall back to proxy when AnkiConnect responded! Throw the real error.
+        throw new Error(data.error);
+      }
+      return data.result;
+    } else {
+      throw new Error(`AnkiConnect HTTP ${response.status}`);
     }
+  } catch (err: any) {
+    directNetworkError = err;
 
-    const data: AnkiResponse<T> = await proxyResponse.json();
-    if (data.error) {
-      throw new Error(`AnkiConnect: ${data.error}`);
+    // If this error came from data.error (AnkiConnect error message), rethrow immediately!
+    const msg = err.message || "";
+    const isNetworkGlitch =
+      msg.includes("Failed to fetch") ||
+      msg.includes("NetworkError") ||
+      msg.includes("Load failed") ||
+      msg.includes("Failed to load");
+
+    if (!isNetworkGlitch) {
+      // It's a real Anki error or HTTP error from Anki
+      throw err;
     }
-    return data.result;
-  } catch (proxyErr: any) {
+  }
+
+  // 2. Only attempt server proxy if running locally on localhost/127.0.0.1
+  const isLocalHost =
+    typeof window !== "undefined" &&
+    (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1");
+
+  if (settings.useProxy && isLocalHost) {
+    try {
+      const proxyResponse = await fetch("/api/ankiconnect/proxy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          endpoint: ankiUrl,
+          action,
+          params,
+          version: 6,
+        }),
+      });
+
+      if (proxyResponse.ok) {
+        const data: AnkiResponse<T> = await proxyResponse.json();
+        if (data.error) {
+          throw new Error(data.error);
+        }
+        return data.result;
+      }
+    } catch (proxyErr: any) {
+      console.warn("Proxy fallback failed:", proxyErr);
+    }
+  }
+
+  // 3. User-friendly explanation for Vercel / HTTPS deployments
+  const isHttps = typeof window !== "undefined" && window.location.protocol === "https:";
+  if (isHttps) {
     throw new Error(
-      `Не удалось связаться с AnkiConnect: убедитесь, что приложение Anki запущено на компьютере и плагин AnkiConnect установлен. (Детали: ${proxyErr.message})`
+      `Браузер заблокировал запрос с HTTPS сайта на локальный Anki (Mixed Content). ` +
+      `В адресной строке браузера нажмите на значок настроек сайта → «Настройки сайтов» → «Небезопасный контент: Разрешить», ` +
+      `либо используйте экспорт в файл Anki (.txt).`
     );
   }
+
+  throw new Error(
+    directNetworkError?.message ||
+      "Не удалось связаться с AnkiConnect: убедитесь, что приложение Anki запущено и дополнение AnkiConnect активно на порту 8765."
+  );
 }
 
 /**
  * Test connection to AnkiConnect and return version
  */
-export async function testAnkiConnection(settings: AnkiSettings): Promise<{ connected: boolean; version?: number; error?: string }> {
+export async function testAnkiConnection(
+  settings: AnkiSettings
+): Promise<{ connected: boolean; version?: number; error?: string }> {
   try {
     const version = await invokeAnkiConnect<number>(settings, "version");
     return { connected: true, version };
@@ -119,12 +166,107 @@ export async function getAnkiModels(settings: AnkiSettings): Promise<string[]> {
  * Ensure a deck exists, creating it if needed
  */
 export async function ensureDeckExists(settings: AnkiSettings, deckName: string): Promise<boolean> {
+  if (!deckName) return false;
   try {
     await invokeAnkiConnect(settings, "createDeck", { deck: deckName });
     return true;
   } catch (err) {
-    console.warn("Could not create deck:", err);
+    console.warn("Deck creation warning (may already exist):", err);
     return false;
+  }
+}
+
+/**
+ * Automatically detects the best available Anki Note Model and Field Names.
+ * Seamlessly handles English Anki ("Basic" -> "Front", "Back")
+ * and Russian Anki ("Основная" -> "Лицевая сторона", "Оборотная сторона").
+ */
+export async function detectAnkiModelAndFields(settings: AnkiSettings): Promise<{
+  modelName: string;
+  frontField: string;
+  backField: string;
+}> {
+  if (cachedModelInfo) {
+    return cachedModelInfo;
+  }
+
+  try {
+    const models = await invokeAnkiConnect<string[]>(settings, "modelNames");
+    if (!models || models.length === 0) {
+      return {
+        modelName: settings.modelName || "Basic",
+        frontField: settings.frontField || "Front",
+        backField: settings.backField || "Back",
+      };
+    }
+
+    // 1. Check if user-specified model exists
+    let chosenModel = models.find((m) => m === settings.modelName);
+
+    // 2. If not, look for Russian standard "Основная" or English standard "Basic"
+    if (!chosenModel) {
+      chosenModel =
+        models.find((m) => m === "Основная") ||
+        models.find((m) => m.toLowerCase() === "basic") ||
+        models.find((m) => m.includes("Основная")) ||
+        models.find((m) => m.toLowerCase().includes("basic")) ||
+        models[0];
+    }
+
+    // 3. Query field names for the selected model
+    const fields = await invokeAnkiConnect<string[]>(settings, "modelFieldNames", {
+      modelName: chosenModel,
+    });
+
+    let front = settings.frontField || "Front";
+    let back = settings.backField || "Back";
+
+    if (fields && fields.length >= 2) {
+      // Find suitable front field
+      const frontCandidates = [
+        "Front",
+        "Лицевая сторона",
+        "Вопрос",
+        "Question",
+        "Text",
+        "Front text",
+      ];
+      const matchedFront = fields.find((f) =>
+        frontCandidates.some((c) => c.toLowerCase() === f.toLowerCase())
+      );
+      front = matchedFront || fields[0];
+
+      // Find suitable back field
+      const backCandidates = [
+        "Back",
+        "Оборотная сторона",
+        "Ответ",
+        "Answer",
+        "Extra",
+        "Back text",
+      ];
+      const matchedBack = fields.find(
+        (f) => f !== front && backCandidates.some((c) => c.toLowerCase() === f.toLowerCase())
+      );
+      back = matchedBack || fields[1];
+    } else if (fields && fields.length === 1) {
+      front = fields[0];
+      back = fields[0];
+    }
+
+    cachedModelInfo = {
+      modelName: chosenModel,
+      frontField: front,
+      backField: back,
+    };
+    return cachedModelInfo;
+  } catch (err) {
+    console.warn("Could not auto-detect Anki model/fields, falling back:", err);
+    return {
+      modelName: settings.modelName || "Basic",
+      frontField: settings.frontField || "Front",
+      backField: settings.backField || "Back",
+    };
   }
 }
 
@@ -141,9 +283,10 @@ export function formatCardFrontHtml(card: WordCard): string {
 }
 
 export function formatCardBackHtml(card: WordCard, dictionaryName?: string): string {
-  const alternativesHtml = card.alternatives && card.alternatives.length > 0
-    ? `<div style="font-size: 14px; color: #64748b; margin-top: 6px;">Синонимы / варианты: <span style="color: #334155;">${card.alternatives.map(escapeHtml).join(", ")}</span></div>`
-    : "";
+  const alternativesHtml =
+    card.alternatives && card.alternatives.length > 0
+      ? `<div style="font-size: 14px; color: #64748b; margin-top: 6px;">Синонимы / варианты: <span style="color: #334155;">${card.alternatives.map(escapeHtml).join(", ")}</span></div>`
+      : "";
 
   const definitionHtml = card.definition
     ? `<div style="font-size: 14px; color: #475569; margin-top: 10px; background-color: #f8fafc; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #6366f1; text-align: left;">${escapeHtml(card.definition)}</div>`
@@ -152,7 +295,7 @@ export function formatCardBackHtml(card: WordCard, dictionaryName?: string): str
   const exampleHtml = card.exampleEn
     ? `<div style="margin-top: 14px; padding: 12px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; text-align: left;">
         <div style="font-size: 15px; color: #166534; font-weight: 500;">${escapeHtml(card.exampleEn)}</div>
-        ${card.exampleRu ? `<div style="font-size: 13px; color: #4ade80; color: #15803d; margin-top: 4px;">${escapeHtml(card.exampleRu)}</div>` : ""}
+        ${card.exampleRu ? `<div style="font-size: 13px; color: #15803d; margin-top: 4px;">${escapeHtml(card.exampleRu)}</div>` : ""}
       </div>`
     : "";
 
@@ -185,10 +328,16 @@ export async function addCardToAnki(
   card: WordCard,
   dictionaryName?: string
 ): Promise<{ noteId: number }> {
-  // Ensure deck exists
-  if (settings.autoCreateDeck) {
-    await ensureDeckExists(settings, settings.deckName);
+  // Target deck: user-selected dictionary name, or configured default
+  const targetDeck = (dictionaryName && dictionaryName.trim()) || settings.deckName || "Общий словарь";
+
+  // Ensure target deck exists in Anki
+  if (settings.autoCreateDeck !== false) {
+    await ensureDeckExists(settings, targetDeck);
   }
+
+  // Resolve model and field names dynamically
+  const { modelName, frontField, backField } = await detectAnkiModelAndFields(settings);
 
   const frontContent = formatCardFrontHtml(card);
   const backContent = formatCardBackHtml(card, dictionaryName);
@@ -199,24 +348,36 @@ export async function addCardToAnki(
     ...(card.tags || []),
   ];
 
+  // Populate fields
+  const fieldsPayload: Record<string, string> = {};
+  if (frontField === backField) {
+    fieldsPayload[frontField] = `${frontContent}<hr style="border:0;border-top:1px dashed #cbd5e1;margin:16px 0;">${backContent}`;
+  } else {
+    fieldsPayload[frontField] = frontContent;
+    fieldsPayload[backField] = backContent;
+  }
+
   const notePayload = {
     note: {
-      deckName: settings.deckName,
-      modelName: settings.modelName || "Basic",
-      fields: {
-        [settings.frontField || "Front"]: frontContent,
-        [settings.backField || "Back"]: backContent,
-      },
+      deckName: targetDeck,
+      modelName,
+      fields: fieldsPayload,
       options: {
-        allowDuplicate: false,
+        allowDuplicate: true, // Allow saving even if term was previously added
         duplicateScope: "deck",
       },
       tags,
     },
   };
 
-  const noteId = await invokeAnkiConnect<number>(settings, "addNote", notePayload);
-  return { noteId };
+  try {
+    const noteId = await invokeAnkiConnect<number>(settings, "addNote", notePayload);
+    return { noteId };
+  } catch (addErr: any) {
+    // If it failed because of cached model or fields, invalidate cache for future calls
+    cachedModelInfo = null;
+    throw addErr;
+  }
 }
 
 function escapeHtml(text: string): string {

@@ -14,6 +14,7 @@ import {
   getAnkiDecks,
   getAnkiModels,
   testAnkiConnection,
+  resetAnkiModelCache,
 } from "../services/ankiConnect";
 
 interface AnkiSettingsModalProps {
@@ -94,6 +95,7 @@ export const AnkiSettingsModal: React.FC<AnkiSettingsModalProps> = ({
   };
 
   const handleSave = () => {
+    resetAnkiModelCache();
     onSaveSettings(formData);
     onClose();
   };
@@ -278,9 +280,19 @@ export const AnkiSettingsModal: React.FC<AnkiSettingsModalProps> = ({
                 className="rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
               />
               <span className="text-xs text-slate-700 dark:text-slate-300">
-                Использовать серверный прокси (помогает при строгих политиках CORS браузера)
+                Использовать локальный прокси при разработке на localhost
               </span>
             </label>
+
+            {/* Note for Vercel / HTTPS users */}
+            <div className="p-3 bg-indigo-50/80 dark:bg-indigo-950/40 rounded-xl border border-indigo-200/60 dark:border-indigo-900/60 text-[11px] text-slate-600 dark:text-slate-300 space-y-1">
+              <div className="font-bold text-indigo-950 dark:text-indigo-200">
+                ⚡ Для деплоя на Vercel (HTTPS):
+              </div>
+              <div>
+                Поскольку Anki запущен локально на вашем ПК (127.0.0.1), браузер может защищать локальную сеть. Нажмите на значок замочка/настроек сайта слева от адреса <strong>vercel.app</strong> → <strong>«Настройки сайтов»</strong> → <strong>«Небезопасный контент»</strong> → <strong>«Разрешить»</strong>, затем обновите страницу.
+              </div>
+            </div>
           </div>
         </div>
 

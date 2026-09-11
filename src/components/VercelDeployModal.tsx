@@ -145,8 +145,40 @@ export const VercelDeployModal: React.FC<VercelDeployModalProps> = ({
               <span>Нажмите «Deploy»</span>
             </div>
             <p className="pl-7 text-xs text-slate-500 dark:text-slate-400">
-              Vercel автоматически скомпилирует приложение через Vite и запустит бессерверный API. Вы получите собственный публичный домен вида <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">your-app.vercel.app</code> с поддержкой HTTPS и мобильных устройств!
+              Vercel автоматически скомпилирует приложение через Vite. Вы получите собственный публичный домен вида <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">your-app.vercel.app</code> с поддержкой мобильных устройств!
             </p>
+          </div>
+
+          {/* Step 5: Connecting to Anki from Vercel */}
+          <div className="space-y-1.5 p-3.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/60 rounded-xl">
+            <div className="font-bold text-emerald-950 dark:text-emerald-200 flex items-center gap-2">
+              <span className="w-5 h-5 rounded-full bg-emerald-600 text-white text-xs flex items-center justify-center font-bold">
+                5
+              </span>
+              <span>Подключение к Anki с домена Vercel (HTTPS)</span>
+            </div>
+            <div className="pl-7 text-xs text-emerald-900 dark:text-emerald-300 space-y-1.5">
+              <p>
+                Браузер защищает локальный компьютер (127.0.0.1) от HTTPS-сайтов. Чтобы отправлять карточки прямо в Anki с Vercel:
+              </p>
+              <ol className="list-decimal pl-4 space-y-1">
+                <li>
+                  В адресной строке браузера слева от URL нажмите на значок настроек сайта (или замочек).
+                </li>
+                <li>
+                  Выберите <strong>«Настройки сайтов» (Site settings)</strong>.
+                </li>
+                <li>
+                  Найдите пункт <strong>«Небезопасный контент» (Insecure content)</strong> и установите <strong>«Разрешить» (Allow)</strong>.
+                </li>
+                <li>
+                  Обновите страницу на Vercel — теперь карточки будут мгновенно залетать в Anki!
+                </li>
+              </ol>
+              <p className="text-[11px] opacity-80 pt-0.5">
+                💡 Если вы не хотите менять настройки браузера, вы можете сохранять карточки в приложении и в 1 клик скачивать файл <strong>«Для Anki (.txt)»</strong>.
+              </p>
+            </div>
           </div>
         </div>
 
