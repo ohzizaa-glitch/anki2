@@ -1,0 +1,6 @@
+{
+  "name": "Anki Cards Creator",
+  "description": "Умный генератор карточек для Anki с автопереводом через ИИ, тематическими словарями, интеграцией AnkiConnect, экспортом в CSV и поддержкой Vercel.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
