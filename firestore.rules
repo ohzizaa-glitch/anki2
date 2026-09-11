@@ -50,7 +50,43 @@ service cloud.firestore {
              data.createdAt is number;
     }
 
-    // User collections and subcollections
+    // Connection test rule
+    match /test/connection {
+      allow get: if true;
+    }
+
+    function isValidVaultId(id) {
+      return id is string && id.size() >= 3 && id.size() <= 64 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // Direct Device Sync Vaults (paired via sync code without OAuth domain constraints)
+    match /sync_vaults/{vaultId} {
+      allow get, create, update: if isValidVaultId(vaultId);
+
+      match /cards/{cardId} {
+        allow get, list: if isValidVaultId(vaultId);
+        allow create: if isValidVaultId(vaultId) && isValidId(cardId) &&
+                         incoming().id == cardId &&
+                         incoming().original is string && incoming().original.size() > 0 && incoming().original.size() <= 500 &&
+                         incoming().translation is string && incoming().translation.size() > 0 && incoming().translation.size() <= 1000 &&
+                         incoming().createdAt is number;
+        allow update: if isValidVaultId(vaultId) && isValidId(cardId) &&
+                         incoming().id == existing().id &&
+                         incoming().original is string && incoming().translation is string &&
+                         incoming().createdAt == existing().createdAt;
+        allow delete: if isValidVaultId(vaultId) && isValidId(cardId);
+      }
+
+      match /dictionaries/{dictionaryId} {
+        allow get, list: if isValidVaultId(vaultId);
+        allow create, update: if isValidVaultId(vaultId) && isValidId(dictionaryId) &&
+                                 incoming().id == dictionaryId &&
+                                 incoming().name is string && incoming().name.size() > 0 && incoming().name.size() <= 100;
+        allow delete: if isValidVaultId(vaultId) && isValidId(dictionaryId);
+      }
+    }
+
+    // User collections and subcollections (OAuth Google)
     match /users/{userId} {
       allow get: if isOwner(userId);
       allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming(), userId);

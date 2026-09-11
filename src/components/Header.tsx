@@ -27,6 +27,7 @@ interface HeaderProps {
   onOpenReview: () => void;
   reviewCount: number;
   user: User | null;
+  syncCode?: string;
   onOpenAccount: () => void;
 }
 
@@ -41,6 +42,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenReview,
   reviewCount,
   user,
+  syncCode,
   onOpenAccount,
 }) => {
   return (
@@ -113,25 +115,16 @@ export const Header: React.FC<HeaderProps> = ({
           )}
 
           {/* Cloud Account / Device Sync Button */}
-          {user ? (
+          {syncCode || user ? (
             <button
               type="button"
               onClick={onOpenAccount}
               className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-full text-xs font-bold bg-white/10 hover:bg-white/20 text-white transition border border-white/15 cursor-pointer"
-              title={`Облако: ${user.email}. Синхронизация между телефоном и ПК активна.`}
+              title={`Синхронизация активна: ${syncCode || user?.email}`}
             >
-              {user.photoURL ? (
-                <img
-                  src={user.photoURL}
-                  alt="Avatar"
-                  referrerPolicy="no-referrer"
-                  className="w-4 h-4 rounded-full object-cover border border-[#bef264]"
-                />
-              ) : (
-                <Cloud className="w-3.5 h-3.5 text-[#bef264]" />
-              )}
-              <span className="hidden sm:inline text-xs font-semibold max-w-[100px] truncate">
-                {user.displayName || "Облако"}
+              <Cloud className="w-3.5 h-3.5 text-[#bef264]" />
+              <span className="hidden sm:inline text-xs font-semibold max-w-[110px] truncate">
+                {syncCode ? syncCode : (user?.displayName || "Облако")}
               </span>
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0 animate-pulse" />
             </button>
@@ -140,10 +133,10 @@ export const Header: React.FC<HeaderProps> = ({
               type="button"
               onClick={onOpenAccount}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black bg-[#bef264] hover:bg-[#a3e635] text-slate-950 transition shadow-sm cursor-pointer"
-              title="Войти через Google для синхронизации с телефоном"
+              title="Подключить телефон для синхронизации"
             >
               <Cloud className="w-3.5 h-3.5 shrink-0" />
-              <span>Войти</span>
+              <span>Телефон</span>
             </button>
           )}
 

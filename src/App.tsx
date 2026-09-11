@@ -25,6 +25,10 @@ import {
   saveDictionaryToCloud,
   deleteDictionaryFromCloud,
   uploadLocalDataToCloud,
+  saveCardToVault,
+  deleteCardFromVault,
+  subscribeToVaultCards,
+  uploadLocalDataToVault,
 } from "./services/firebase";
 import { Header } from "./components/Header";
 import { WordInputForm } from "./components/WordInputForm";
@@ -70,6 +74,68 @@ export default function App() {
   // User Authentication & Cloud Sync
   const [user, setUser] = useState<User | null>(null);
   const [isAccountOpen, setIsAccountOpen] = useState(false);
+
+  // Phone Sync Code (Device Pairing without Google OAuth domain restrictions)
+  const [syncCode, setSyncCode] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      const urlSync = urlParams.get("sync");
+      if (urlSync) {
+        const clean = urlSync.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+        if (clean) {
+          localStorage.setItem("anki_sync_code_v1", clean);
+          return clean;
+        }
+      }
+    }
+    const saved = localStorage.getItem("anki_sync_code_v1");
+    if (saved) return saved;
+    const initial = `anki-${Math.floor(1000 + Math.random() * 9000)}`;
+    localStorage.setItem("anki_sync_code_v1", initial);
+    return initial;
+  });
+
+  const handleSetSyncCode = (code: string) => {
+    const clean = code.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "");
+    setSyncCode(clean);
+    if (clean) {
+      localStorage.setItem("anki_sync_code_v1", clean);
+      showToast(`Код синхронизации: ${clean}`, "success");
+    } else {
+      localStorage.removeItem("anki_sync_code_v1");
+      showToast("Синхронизация отключена", "info");
+    }
+  };
+
+  const handleDisconnectSync = () => {
+    setSyncCode("");
+    localStorage.removeItem("anki_sync_code_v1");
+    showToast("Синхронизация отключена", "info");
+  };
+
+  // Real-time Firestore Vault sync for paired devices via syncCode
+  useEffect(() => {
+    if (!syncCode) return;
+
+    const unsubVault = subscribeToVaultCards(
+      syncCode,
+      (vaultCards) => {
+        if (vaultCards.length > 0) {
+          setCards(vaultCards);
+        } else {
+          // If vault is empty, upload existing local cards
+          const local = loadStoredCards();
+          const localDicts = loadStoredDictionaries();
+          if (local.length > 0) {
+            uploadLocalDataToVault(syncCode, local, localDicts);
+          }
+        }
+      },
+      (err) => console.warn("Vault sync error:", err)
+    );
+
+    return () => unsubVault();
+  }, [syncCode]);
 
   // Modals state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -139,9 +205,13 @@ export default function App() {
   }, [user]);
 
   const handleManualSyncToCloud = async () => {
-    if (!user) return;
-    await uploadLocalDataToCloud(user.uid, cards, dictionaries);
-    showToast("Все карточки и колоды синхронизированы с облаком!", "success");
+    if (syncCode) {
+      await uploadLocalDataToVault(syncCode, cards, dictionaries);
+      showToast(`Карточки синхронизированы по коду "${syncCode}"!`, "success");
+    } else if (user) {
+      await uploadLocalDataToCloud(user.uid, cards, dictionaries);
+      showToast("Все карточки и колоды синхронизированы с облаком!", "success");
+    }
   };
 
   // Sync theme with HTML root class
@@ -219,6 +289,9 @@ export default function App() {
         newCard.ankiStatus = "synced";
         newCard.ankiNoteId = noteId;
         setCards((prev) => [newCard, ...prev]);
+        if (syncCode) {
+          saveCardToVault(syncCode, newCard).catch((e) => console.warn("Vault save error:", e));
+        }
         if (user) {
           saveCardToCloud(user.uid, newCard).catch((e) => console.warn("Cloud save error:", e));
         }
@@ -230,6 +303,9 @@ export default function App() {
         newCard.ankiStatus = "error";
         newCard.ankiError = err.message;
         setCards((prev) => [newCard, ...prev]);
+        if (syncCode) {
+          saveCardToVault(syncCode, newCard).catch((e) => console.warn("Vault save error:", e));
+        }
         if (user) {
           saveCardToCloud(user.uid, newCard).catch((e) => console.warn("Cloud save error:", e));
         }
@@ -241,6 +317,9 @@ export default function App() {
       }
     } else {
       setCards((prev) => [newCard, ...prev]);
+      if (syncCode) {
+        saveCardToVault(syncCode, newCard).catch((e) => console.warn("Vault save error:", e));
+      }
       if (user) {
         saveCardToCloud(user.uid, newCard).catch((e) => console.warn("Cloud save error:", e));
       }
@@ -260,6 +339,9 @@ export default function App() {
           c.id === card.id ? updatedCard : c
         )
       );
+      if (syncCode) {
+        saveCardToVault(syncCode, updatedCard).catch((e) => console.warn("Vault sync update error:", e));
+      }
       if (user) {
         saveCardToCloud(user.uid, updatedCard).catch((e) => console.warn("Cloud sync update error:", e));
       }
@@ -273,6 +355,9 @@ export default function App() {
           c.id === card.id ? errCard : c
         )
       );
+      if (syncCode) {
+        saveCardToVault(syncCode, errCard).catch((e) => console.warn("Vault sync update error:", e));
+      }
       if (user) {
         saveCardToCloud(user.uid, errCard).catch((e) => console.warn("Cloud sync update error:", e));
       }
@@ -302,6 +387,9 @@ export default function App() {
             c.id === card.id ? updatedCard : c
           )
         );
+        if (syncCode) {
+          saveCardToVault(syncCode, updatedCard).catch((e) => console.warn("Vault sync update error:", e));
+        }
         if (user) {
           saveCardToCloud(user.uid, updatedCard).catch((e) => console.warn("Cloud sync update error:", e));
         }
@@ -323,6 +411,9 @@ export default function App() {
   // Delete Card
   const handleDeleteCard = (cardId: string) => {
     setCards((prev) => prev.filter((c) => c.id !== cardId));
+    if (syncCode) {
+      deleteCardFromVault(syncCode, cardId).catch((e) => console.warn("Vault delete error:", e));
+    }
     if (user) {
       deleteCardFromCloud(user.uid, cardId).catch((e) => console.warn("Cloud delete error:", e));
     }
@@ -424,6 +515,7 @@ export default function App() {
         onOpenReview={() => setIsReviewOpen(true)}
         reviewCount={cards.length}
         user={user}
+        syncCode={syncCode}
         onOpenAccount={() => setIsAccountOpen(true)}
       />
 
@@ -440,8 +532,32 @@ export default function App() {
               activeTab === "add" || activeTab === "record" ? "block" : "hidden lg:block"
             }`}
           >
-            {/* Cloud Sync Status / Quick Bridge Notice */}
-            {!user ? (
+            {/* Cloud Sync Status / Phone Pairing Notice */}
+            {syncCode ? (
+              <div className="mb-4 px-3.5 py-2.5 rounded-2xl bg-indigo-950/50 border border-indigo-500/30 text-indigo-200 flex items-center justify-between gap-2 text-xs shadow-md">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-500/30">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[11px] font-bold text-white">Синхронизация активна</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                    </div>
+                    <p className="text-[10px] text-slate-300 truncate">
+                      Код: <strong className="text-white font-mono">{syncCode}</strong> • {cards.length} карточек в облаке
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAccountOpen(true)}
+                  className="px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] shrink-0 transition cursor-pointer"
+                >
+                  Ссылка для тел.
+                </button>
+              </div>
+            ) : (
               <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-blue-950/70 border border-indigo-500/30 text-white shadow-lg flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-500/30">
@@ -464,23 +580,7 @@ export default function App() {
                   onClick={() => setIsAccountOpen(true)}
                   className="px-3 py-1.5 rounded-xl bg-[#bef264] hover:bg-[#a3e635] text-slate-950 font-black text-xs shrink-0 transition shadow-sm cursor-pointer"
                 >
-                  Войти
-                </button>
-              </div>
-            ) : (
-              <div className="mb-4 px-3.5 py-2.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 flex items-center justify-between gap-2 text-xs">
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
-                  <span className="text-[11px] font-medium truncate">
-                    Синхронизация активна • <strong>{cards.length}</strong> карточек в облаке
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAccountOpen(true)}
-                  className="text-[11px] font-bold text-[#bef264] hover:underline shrink-0"
-                >
-                  Аккаунт
+                  Подключить
                 </button>
               </div>
             )}
@@ -611,6 +711,9 @@ export default function App() {
         user={user}
         cardsCount={cards.length}
         unsyncedToAnkiCount={cards.filter((c) => c.ankiStatus !== "synced").length}
+        syncCode={syncCode}
+        onSetSyncCode={handleSetSyncCode}
+        onDisconnectSync={handleDisconnectSync}
         onSyncLocalCardsToCloud={handleManualSyncToCloud}
       />
     </div>

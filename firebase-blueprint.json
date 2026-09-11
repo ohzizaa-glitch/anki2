@@ -171,6 +171,18 @@
     }
   },
   "firestore": {
+    "/sync_vaults/{vaultId}": {
+      "schema": "User",
+      "description": "Sync vault metadata for paired devices (phone and desktop)"
+    },
+    "/sync_vaults/{vaultId}/cards/{cardId}": {
+      "schema": "Card",
+      "description": "Vocabulary cards synced between phone and desktop"
+    },
+    "/sync_vaults/{vaultId}/dictionaries/{dictionaryId}": {
+      "schema": "Dictionary",
+      "description": "Dictionary categories synced between phone and desktop"
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User profile document storing basic user metadata"

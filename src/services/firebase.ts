@@ -174,6 +174,145 @@ export async function saveCardToCloud(userId: string, card: WordCard): Promise<v
   }
 }
 
+// Direct Sync Vault Methods (Sync Code between Phone & PC)
+export async function saveCardToVault(vaultId: string, card: WordCard): Promise<void> {
+  const cleanVaultId = vaultId.trim().toLowerCase();
+  const cardPath = `sync_vaults/${cleanVaultId}/cards/${card.id}`;
+  try {
+    const cardRef = doc(db, "sync_vaults", cleanVaultId, "cards", card.id);
+    const payload = {
+      id: card.id,
+      original: card.original || "",
+      translation: card.translation || "",
+      alternatives: card.alternatives || [],
+      transcription: card.transcription || "",
+      partOfSpeech: card.partOfSpeech || "",
+      definition: card.definition || "",
+      exampleEn: card.exampleEn || "",
+      exampleRu: card.exampleRu || "",
+      mnemonic: card.mnemonic || "",
+      tags: card.tags || [],
+      dictionaryId: card.dictionaryId || "default",
+      ankiStatus: card.ankiStatus || "not_added",
+      ankiNoteId: card.ankiNoteId || null,
+      ankiError: card.ankiError || null,
+      createdAt: card.createdAt || Date.now(),
+    };
+    await setDoc(cardRef, payload, { merge: true });
+  } catch (error) {
+    console.error("Failed to save card to vault:", error);
+  }
+}
+
+export async function deleteCardFromVault(vaultId: string, cardId: string): Promise<void> {
+  const cleanVaultId = vaultId.trim().toLowerCase();
+  try {
+    const cardRef = doc(db, "sync_vaults", cleanVaultId, "cards", cardId);
+    await deleteDoc(cardRef);
+  } catch (error) {
+    console.error("Failed to delete card from vault:", error);
+  }
+}
+
+export function subscribeToVaultCards(
+  vaultId: string,
+  onUpdate: (cards: WordCard[]) => void,
+  onError?: (err: unknown) => void
+): () => void {
+  const cleanVaultId = vaultId.trim().toLowerCase();
+  const cardsCol = collection(db, "sync_vaults", cleanVaultId, "cards");
+
+  return onSnapshot(
+    cardsCol,
+    (snapshot) => {
+      const cards: WordCard[] = snapshot.docs.map((docSnap) => {
+        const d = docSnap.data();
+        return {
+          id: d.id,
+          original: d.original,
+          translation: d.translation,
+          alternatives: d.alternatives || [],
+          transcription: d.transcription || "",
+          partOfSpeech: d.partOfSpeech || "",
+          definition: d.definition || "",
+          exampleEn: d.exampleEn || "",
+          exampleRu: d.exampleRu || "",
+          mnemonic: d.mnemonic || "",
+          tags: d.tags || [],
+          dictionaryId: d.dictionaryId || "default",
+          ankiStatus: d.ankiStatus || "not_added",
+          ankiNoteId: d.ankiNoteId || undefined,
+          ankiError: d.ankiError || undefined,
+          createdAt: d.createdAt || Date.now(),
+        } as WordCard;
+      });
+      onUpdate(cards);
+    },
+    (error) => {
+      if (onError) onError(error);
+      console.error("Vault subscription error:", error);
+    }
+  );
+}
+
+export async function uploadLocalDataToVault(
+  vaultId: string,
+  localCards: WordCard[],
+  localDictionaries: Dictionary[]
+): Promise<void> {
+  const cleanVaultId = vaultId.trim().toLowerCase();
+  try {
+    const batch = writeBatch(db);
+
+    for (const dict of localDictionaries) {
+      const dictRef = doc(db, "sync_vaults", cleanVaultId, "dictionaries", dict.id);
+      batch.set(
+        dictRef,
+        {
+          id: dict.id,
+          name: dict.name,
+          description: dict.description || "",
+          icon: dict.icon || "BookOpen",
+          color: dict.color || "indigo",
+          isDefault: Boolean(dict.isDefault),
+          createdAt: dict.createdAt || Date.now(),
+        },
+        { merge: true }
+      );
+    }
+
+    for (const card of localCards) {
+      const cardRef = doc(db, "sync_vaults", cleanVaultId, "cards", card.id);
+      batch.set(
+        cardRef,
+        {
+          id: card.id,
+          original: card.original || "",
+          translation: card.translation || "",
+          alternatives: card.alternatives || [],
+          transcription: card.transcription || "",
+          partOfSpeech: card.partOfSpeech || "",
+          definition: card.definition || "",
+          exampleEn: card.exampleEn || "",
+          exampleRu: card.exampleRu || "",
+          mnemonic: card.mnemonic || "",
+          tags: card.tags || [],
+          dictionaryId: card.dictionaryId || "default",
+          ankiStatus: card.ankiStatus || "not_added",
+          ankiNoteId: card.ankiNoteId || null,
+          ankiError: card.ankiError || null,
+          createdAt: card.createdAt || Date.now(),
+        },
+        { merge: true }
+      );
+    }
+
+    await batch.commit();
+  } catch (error) {
+    console.error("Failed to upload local data to vault:", error);
+  }
+}
+
 export async function deleteCardFromCloud(userId: string, cardId: string): Promise<void> {
   const cardPath = `users/${userId}/cards/${cardId}`;
   try {
