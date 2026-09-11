@@ -1,0 +1,95 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUser(data, userId) {
+      return data.id is string && data.id == userId &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 256;
+    }
+
+    function isValidCard(data, userId) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId is string && data.userId == userId &&
+             data.original is string && data.original.size() > 0 && data.original.size() <= 500 &&
+             data.translation is string && data.translation.size() > 0 && data.translation.size() <= 1000 &&
+             data.dictionaryId is string && data.dictionaryId.size() <= 128 &&
+             data.ankiStatus in ['not_added', 'synced', 'error'] &&
+             data.createdAt is number;
+    }
+
+    function isValidDictionary(data, userId) {
+      return data.id is string && isValidId(data.id) &&
+             data.userId is string && data.userId == userId &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.createdAt is number;
+    }
+
+    // User collections and subcollections
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidId(userId) && isValidUser(incoming(), userId);
+      allow update: if isOwner(userId) && isValidId(userId) && isValidUser(incoming(), userId) &&
+                       incoming().id == existing().id &&
+                       incoming().email == existing().email;
+      allow delete: if false;
+
+      // Cards subcollection
+      match /cards/{cardId} {
+        allow get: if isOwner(userId) && isValidId(cardId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(cardId) &&
+                         incoming().id == cardId &&
+                         incoming().userId == userId &&
+                         isValidCard(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(cardId) &&
+                         isValidCard(incoming(), userId) &&
+                         incoming().id == existing().id &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt;
+        allow delete: if isOwner(userId) && isValidId(cardId);
+      }
+
+      // Dictionaries subcollection
+      match /dictionaries/{dictionaryId} {
+        allow get: if isOwner(userId) && isValidId(dictionaryId);
+        allow list: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidId(userId) && isValidId(dictionaryId) &&
+                         incoming().id == dictionaryId &&
+                         incoming().userId == userId &&
+                         isValidDictionary(incoming(), userId);
+        allow update: if isOwner(userId) && isValidId(userId) && isValidId(dictionaryId) &&
+                         isValidDictionary(incoming(), userId) &&
+                         incoming().id == existing().id &&
+                         incoming().userId == existing().userId &&
+                         incoming().createdAt == existing().createdAt;
+        allow delete: if isOwner(userId) && isValidId(dictionaryId);
+      }
+    }
+  }
+}

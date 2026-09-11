@@ -15,6 +15,17 @@ import {
   testAnkiConnection,
 } from "./services/ankiConnect";
 import { AnkiSettings, Dictionary, ThemeMode, WordCard } from "./types";
+import { User } from "firebase/auth";
+import {
+  onAuthChange,
+  subscribeToCloudCards,
+  subscribeToCloudDictionaries,
+  saveCardToCloud,
+  deleteCardFromCloud,
+  saveDictionaryToCloud,
+  deleteDictionaryFromCloud,
+  uploadLocalDataToCloud,
+} from "./services/firebase";
 import { Header } from "./components/Header";
 import { WordInputForm } from "./components/WordInputForm";
 import { RightDecksPanel } from "./components/RightDecksPanel";
@@ -24,12 +35,15 @@ import { AnkiGuideModal } from "./components/AnkiGuideModal";
 import { AnkiSettingsModal } from "./components/AnkiSettingsModal";
 import { VercelDeployModal } from "./components/VercelDeployModal";
 import { NewDictionaryModal } from "./components/NewDictionaryModal";
+import { UserAccountModal } from "./components/UserAccountModal";
 import {
   CheckCircle2,
   AlertCircle,
   X,
   Columns,
   Maximize2,
+  Smartphone,
+  Cloud,
 } from "lucide-react";
 
 export default function App() {
@@ -53,6 +67,10 @@ export default function App() {
   const [ankiConnected, setAnkiConnected] = useState<boolean | null>(null);
   const [ankiVersion, setAnkiVersion] = useState<number | undefined>(undefined);
 
+  // User Authentication & Cloud Sync
+  const [user, setUser] = useState<User | null>(null);
+  const [isAccountOpen, setIsAccountOpen] = useState(false);
+
   // Modals state
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isGuideOpen, setIsGuideOpen] = useState(false);
@@ -69,6 +87,62 @@ export default function App() {
       setToast((prev) => (prev?.message === message ? null : prev));
     }, 3800);
   }, []);
+
+  // Listen to Auth State
+  useEffect(() => {
+    const unsub = onAuthChange((currentUser) => {
+      setUser(currentUser);
+      if (currentUser) {
+        showToast(`Вход выполнен: ${currentUser.displayName || currentUser.email}`, "success");
+      }
+    });
+    return () => unsub();
+  }, [showToast]);
+
+  // Real-time Firestore sync when user is authenticated
+  useEffect(() => {
+    if (!user) return;
+
+    // 1. Subscribe to cards in cloud
+    const unsubCards = subscribeToCloudCards(
+      user.uid,
+      (cloudCards) => {
+        if (cloudCards.length > 0) {
+          setCards(cloudCards);
+        } else {
+          // If cloud has 0 cards but user has local cards, auto-upload to cloud!
+          const local = loadStoredCards();
+          const localDicts = loadStoredDictionaries();
+          if (local.length > 0) {
+            uploadLocalDataToCloud(user.uid, local, localDicts);
+          }
+        }
+      },
+      (err) => console.warn("Cloud cards sync error:", err)
+    );
+
+    // 2. Subscribe to dictionaries in cloud
+    const unsubDicts = subscribeToCloudDictionaries(
+      user.uid,
+      (cloudDicts) => {
+        if (cloudDicts.length > 0) {
+          setDictionaries(cloudDicts);
+        }
+      },
+      (err) => console.warn("Cloud dicts sync error:", err)
+    );
+
+    return () => {
+      unsubCards();
+      unsubDicts();
+    };
+  }, [user]);
+
+  const handleManualSyncToCloud = async () => {
+    if (!user) return;
+    await uploadLocalDataToCloud(user.uid, cards, dictionaries);
+    showToast("Все карточки и колоды синхронизированы с облаком!", "success");
+  };
 
   // Sync theme with HTML root class
   useEffect(() => {
@@ -145,6 +219,9 @@ export default function App() {
         newCard.ankiStatus = "synced";
         newCard.ankiNoteId = noteId;
         setCards((prev) => [newCard, ...prev]);
+        if (user) {
+          saveCardToCloud(user.uid, newCard).catch((e) => console.warn("Cloud save error:", e));
+        }
         setAnkiConnected(true);
         showToast(`Карточка "${newCard.original}" создана и добавлена в Anki! ⚡`, "success");
         return { success: true };
@@ -153,6 +230,9 @@ export default function App() {
         newCard.ankiStatus = "error";
         newCard.ankiError = err.message;
         setCards((prev) => [newCard, ...prev]);
+        if (user) {
+          saveCardToCloud(user.uid, newCard).catch((e) => console.warn("Cloud save error:", e));
+        }
         showToast(
           `Слово сохранено в словарь, но не передано в Anki (${err.message})`,
           "error"
@@ -161,6 +241,9 @@ export default function App() {
       }
     } else {
       setCards((prev) => [newCard, ...prev]);
+      if (user) {
+        saveCardToCloud(user.uid, newCard).catch((e) => console.warn("Cloud save error:", e));
+      }
       showToast(`Слово "${newCard.original}" сохранено в словарь`, "success");
       return { success: true };
     }
@@ -171,20 +254,28 @@ export default function App() {
     const dict = dictionaries.find((d) => d.id === card.dictionaryId);
     try {
       const { noteId } = await addCardToAnki(ankiSettings, card, dict?.name);
+      const updatedCard = { ...card, ankiStatus: "synced" as const, ankiNoteId: noteId, ankiError: undefined };
       setCards((prev) =>
         prev.map((c) =>
-          c.id === card.id ? { ...c, ankiStatus: "synced", ankiNoteId: noteId, ankiError: undefined } : c
+          c.id === card.id ? updatedCard : c
         )
       );
+      if (user) {
+        saveCardToCloud(user.uid, updatedCard).catch((e) => console.warn("Cloud sync update error:", e));
+      }
       setAnkiConnected(true);
       showToast(`Карточка "${card.original}" отправлена в Anki!`, "success");
       return { success: true };
     } catch (err: any) {
+      const errCard = { ...card, ankiStatus: "error" as const, ankiError: err.message };
       setCards((prev) =>
         prev.map((c) =>
-          c.id === card.id ? { ...c, ankiStatus: "error", ankiError: err.message } : c
+          c.id === card.id ? errCard : c
         )
       );
+      if (user) {
+        saveCardToCloud(user.uid, errCard).catch((e) => console.warn("Cloud sync update error:", e));
+      }
       showToast(`Не удалось отправить в Anki: ${err.message}`, "error");
       return { success: false, error: err.message };
     }
@@ -205,11 +296,15 @@ export default function App() {
       const dict = dictionaries.find((d) => d.id === card.dictionaryId);
       try {
         const { noteId } = await addCardToAnki(ankiSettings, card, dict?.name);
+        const updatedCard = { ...card, ankiStatus: "synced" as const, ankiNoteId: noteId, ankiError: undefined };
         setCards((prev) =>
           prev.map((c) =>
-            c.id === card.id ? { ...c, ankiStatus: "synced", ankiNoteId: noteId } : c
+            c.id === card.id ? updatedCard : c
           )
         );
+        if (user) {
+          saveCardToCloud(user.uid, updatedCard).catch((e) => console.warn("Cloud sync update error:", e));
+        }
         successCount++;
       } catch {
         failCount++;
@@ -228,6 +323,9 @@ export default function App() {
   // Delete Card
   const handleDeleteCard = (cardId: string) => {
     setCards((prev) => prev.filter((c) => c.id !== cardId));
+    if (user) {
+      deleteCardFromCloud(user.uid, cardId).catch((e) => console.warn("Cloud delete error:", e));
+    }
     showToast("Карточка удалена", "info");
   };
 
@@ -240,6 +338,9 @@ export default function App() {
     };
     setDictionaries((prev) => [...prev, newDict]);
     setActiveDictionaryId(newDict.id);
+    if (user) {
+      saveDictionaryToCloud(user.uid, newDict).catch((e) => console.warn("Cloud save dict error:", e));
+    }
     showToast(`Колода "${newDict.name}" создана`, "success");
   };
 
@@ -251,6 +352,9 @@ export default function App() {
     setDictionaries((prev) => prev.filter((d) => d.id !== dictId));
     if (activeDictionaryId === dictId) {
       setActiveDictionaryId("all");
+    }
+    if (user) {
+      deleteDictionaryFromCloud(user.uid, dictId).catch((e) => console.warn("Cloud delete dict error:", e));
     }
     showToast("Колода удалена. Карточки перемещены в общий словарь", "info");
   };
@@ -319,6 +423,8 @@ export default function App() {
         onOpenVercel={() => setIsVercelOpen(true)}
         onOpenReview={() => setIsReviewOpen(true)}
         reviewCount={cards.length}
+        user={user}
+        onOpenAccount={() => setIsAccountOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -334,6 +440,51 @@ export default function App() {
               activeTab === "add" || activeTab === "record" ? "block" : "hidden lg:block"
             }`}
           >
+            {/* Cloud Sync Status / Quick Bridge Notice */}
+            {!user ? (
+              <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-blue-950/70 border border-indigo-500/30 text-white shadow-lg flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-500/30">
+                    <Smartphone className="w-4 h-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                      <span>Синхронизация с телефоном</span>
+                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.2 bg-[#bef264]/20 text-[#bef264] rounded-sm font-black border border-[#bef264]/30">
+                        FREE
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 truncate">
+                      Добавляйте слова на телефоне — дома скидывайте в Anki!
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAccountOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-[#bef264] hover:bg-[#a3e635] text-slate-950 font-black text-xs shrink-0 transition shadow-sm cursor-pointer"
+                >
+                  Войти
+                </button>
+              </div>
+            ) : (
+              <div className="mb-4 px-3.5 py-2.5 rounded-2xl bg-emerald-950/40 border border-emerald-500/30 text-emerald-200 flex items-center justify-between gap-2 text-xs">
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                  <span className="text-[11px] font-medium truncate">
+                    Синхронизация активна • <strong>{cards.length}</strong> карточек в облаке
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsAccountOpen(true)}
+                  className="text-[11px] font-bold text-[#bef264] hover:underline shrink-0"
+                >
+                  Аккаунт
+                </button>
+              </div>
+            )}
+
             <WordInputForm
               dictionaries={dictionaries}
               activeDictionaryId={activeDictionaryId === "all" ? dictionaries[0]?.id || "dict_general" : activeDictionaryId}
@@ -452,6 +603,15 @@ export default function App() {
         isOpen={isNewDictOpen}
         onClose={() => setIsNewDictOpen(false)}
         onCreateDictionary={handleCreateDictionary}
+      />
+
+      <UserAccountModal
+        isOpen={isAccountOpen}
+        onClose={() => setIsAccountOpen(false)}
+        user={user}
+        cardsCount={cards.length}
+        unsyncedToAnkiCount={cards.filter((c) => c.ankiStatus !== "synced").length}
+        onSyncLocalCardsToCloud={handleManualSyncToCloud}
       />
     </div>
   );

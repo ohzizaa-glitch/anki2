@@ -201,17 +201,22 @@ export const AnkiGuideModal: React.FC<AnkiGuideModalProps> = ({
             </div>
             <div className="pl-8 space-y-2 text-slate-600 dark:text-slate-300">
               <p>
-                Сайт полностью оптимизирован для мобильных телефонов (iOS Safari и Android Chrome):
+                Сайт полностью оптимизирован для работы на телефоне и компьютере:
               </p>
-              <ul className="list-disc pl-5 space-y-1">
+              <ul className="list-disc pl-5 space-y-1.5">
                 <li>
-                  <strong>Синхронизация через CSV:</strong> Создавайте и сохраняйте слова на смартфоне в любое время. Когда будете за ПК, нажмите{" "}
-                  <strong>«Экспорт CSV»</strong> или <strong>«Для Anki (.txt)»</strong> и загрузите их в Anki через <em>Файл → Импорт</em>.
+                  <strong className="text-indigo-600 dark:text-indigo-400">⚡ Облачная синхронизация (Рекомендуется):</strong> Нажмите{" "}
+                  <strong>«Войти»</strong> в верхнем правом углу на телефоне и на компьютере под одним Google-аккаунтом. Все добавленные с телефона слова мгновенно сохраняются в облаке. Дома на компьютере откройте сайт и нажмите{" "}
+                  <strong>«В Anki все»</strong> — и все слова окажутся в вашем десктопном Anki!
                 </li>
                 <li>
-                  <strong>Прямое добавление по Wi-Fi:</strong> Если ваш телефон и компьютер подключены к одной Wi-Fi сети, откройте{" "}
-                  <strong>Настройки Anki</strong> в приложении и укажите локальный IP вашего компьютера (например:{" "}
-                  <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">http://192.168.1.50:8765</code>). Карточки с телефона будут мгновенно создаваться в Anki на вашем ПК!
+                  <strong>Синхронизация через файл (.txt / CSV):</strong> Если вы без авторизации, можете скачать файл карточек кнопкой{" "}
+                  <strong>«Для Anki (.txt)»</strong> и загрузить в Anki через <em>Файл → Импорт</em>.
+                </li>
+                <li>
+                  <strong>Прямое добавление по Wi-Fi:</strong> Если ваш телефон и компьютер подключены к одной Wi-Fi сети, в{" "}
+                  <strong>Настройках Anki</strong> можно указать локальный IP вашего компьютера (например:{" "}
+                  <code className="bg-slate-100 dark:bg-slate-800 px-1 py-0.5 rounded">http://192.168.1.50:8765</code>).
                 </li>
               </ul>
             </div>

@@ -1,0 +1,187 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User account profile information",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "User unique identifier matching auth UID",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address",
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "description": "User display name",
+          "maxLength": 128
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "User avatar photo URL",
+          "maxLength": 1024
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user account profile was created",
+          "maxLength": 64
+        }
+      },
+      "required": ["id", "email"]
+    },
+    "Card": {
+      "title": "Card",
+      "description": "Vocabulary flashcard synced across mobile and desktop devices",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique card ID",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID",
+          "maxLength": 128
+        },
+        "original": {
+          "type": "string",
+          "description": "Original foreign word or expression",
+          "maxLength": 500
+        },
+        "translation": {
+          "type": "string",
+          "description": "Primary translation of the word",
+          "maxLength": 1000
+        },
+        "alternatives": {
+          "type": "array",
+          "description": "List of alternative translations or synonyms"
+        },
+        "transcription": {
+          "type": "string",
+          "description": "IPA phonetic transcription",
+          "maxLength": 200
+        },
+        "partOfSpeech": {
+          "type": "string",
+          "description": "Part of speech category",
+          "maxLength": 50
+        },
+        "definition": {
+          "type": "string",
+          "description": "Definition or explanation",
+          "maxLength": 1000
+        },
+        "exampleEn": {
+          "type": "string",
+          "description": "Usage example in English",
+          "maxLength": 1000
+        },
+        "exampleRu": {
+          "type": "string",
+          "description": "Russian translation of the usage example",
+          "maxLength": 1000
+        },
+        "mnemonic": {
+          "type": "string",
+          "description": "Association or mnemonic helper",
+          "maxLength": 1000
+        },
+        "tags": {
+          "type": "array",
+          "description": "Tags associated with the card"
+        },
+        "dictionaryId": {
+          "type": "string",
+          "description": "ID of the dictionary or deck category",
+          "maxLength": 128
+        },
+        "ankiStatus": {
+          "type": "string",
+          "description": "Current Anki synchronization status",
+          "enum": ["not_added", "synced", "error"],
+          "maxLength": 30
+        },
+        "ankiNoteId": {
+          "type": "number",
+          "description": "ID of note generated inside Anki"
+        },
+        "ankiError": {
+          "type": "string",
+          "description": "Last error encountered during AnkiConnect export",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        }
+      },
+      "required": ["id", "userId", "original", "translation", "dictionaryId", "ankiStatus", "createdAt"]
+    },
+    "Dictionary": {
+      "title": "Dictionary",
+      "description": "User dictionary or deck category",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique dictionary identifier",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "Dictionary name",
+          "maxLength": 100
+        },
+        "description": {
+          "type": "string",
+          "description": "Dictionary description",
+          "maxLength": 500
+        },
+        "icon": {
+          "type": "string",
+          "description": "Icon identifier",
+          "maxLength": 50
+        },
+        "color": {
+          "type": "string",
+          "description": "Color theme class or hex",
+          "maxLength": 50
+        },
+        "isDefault": {
+          "type": "boolean",
+          "description": "Whether this is the primary default dictionary"
+        },
+        "createdAt": {
+          "type": "number",
+          "description": "Creation timestamp in milliseconds"
+        }
+      },
+      "required": ["id", "userId", "name", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile document storing basic user metadata"
+    },
+    "/users/{userId}/cards/{cardId}": {
+      "schema": "Card",
+      "description": "User vocabulary cards synced across devices"
+    },
+    "/users/{userId}/dictionaries/{dictionaryId}": {
+      "schema": "Dictionary",
+      "description": "User custom dictionary categories"
+    }
+  }
+}
