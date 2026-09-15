@@ -134,7 +134,7 @@ export const WordInputForm: React.FC<WordInputFormProps> = ({
   };
 
   return (
-    <div className="bg-[#0e214d] text-white rounded-3xl p-5 sm:p-7 shadow-2xl border border-[#1d3570] relative overflow-hidden flex flex-col justify-between">
+    <div className="bg-[#0e214d] text-white rounded-3xl p-4 sm:p-7 shadow-2xl border border-[#1d3570] relative overflow-hidden flex flex-col justify-between">
       {/* Background Decorative Retro Stars */}
       <div className="absolute top-6 right-6 pointer-events-none opacity-25">
         <svg width="48" height="48" viewBox="0 0 100 100" fill="#bef264">
@@ -149,11 +149,11 @@ export const WordInputForm: React.FC<WordInputFormProps> = ({
 
       <div>
         {/* Top Header - Bold Neon Green text */}
-        <div className="mb-5">
-          <div className="text-[12px] font-black tracking-widest text-[#bef264] uppercase opacity-90">
+        <div className="mb-4 sm:mb-5">
+          <div className="text-[11px] sm:text-[12px] font-black tracking-widest text-[#bef264] uppercase opacity-90">
             LEXISYNC:
           </div>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-[#bef264] uppercase leading-tight">
+          <h2 className="text-xl sm:text-3xl font-black tracking-tight text-[#bef264] uppercase leading-tight">
             ДОБАВЛЕНИЕ СЛОВ
           </h2>
         </div>
@@ -166,7 +166,7 @@ export const WordInputForm: React.FC<WordInputFormProps> = ({
           </div>
 
           {/* Main Ivory/White Container Card */}
-          <div className="bg-[#fcfaf5] text-slate-900 rounded-3xl p-4 sm:p-6 shadow-xl border border-slate-200 space-y-4">
+          <div className="bg-[#fcfaf5] text-slate-900 rounded-3xl p-3.5 sm:p-6 shadow-xl border border-slate-200 space-y-4">
             {/* Field: Колода */}
             <div>
               <div className="flex items-center justify-between mb-1.5">
@@ -420,20 +420,20 @@ export const WordInputForm: React.FC<WordInputFormProps> = ({
           type="button"
           onClick={() => handleCreateCard(true)}
           disabled={isAdding || !originalWord.trim()}
-          className="w-full py-4 sm:py-4.5 px-6 rounded-full bg-[#bef264] hover:bg-[#aef037] active:scale-[0.98] text-slate-950 font-black text-base sm:text-lg tracking-tight uppercase shadow-lg shadow-[#bef264]/25 transition duration-150 flex items-center justify-center gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer select-none"
+          className="w-full py-3.5 sm:py-4.5 px-4 sm:px-6 rounded-full bg-[#bef264] hover:bg-[#aef037] active:scale-[0.98] text-slate-950 font-black text-sm sm:text-lg tracking-tight uppercase shadow-lg shadow-[#bef264]/25 transition duration-150 flex items-center justify-center gap-1.5 sm:gap-2.5 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer select-none"
         >
           {isAdding ? (
             <>
-              <Loader2 className="w-5 h-5 animate-spin text-black" />
+              <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin text-black" />
               <span>СОЗДАНИЕ КАРТОЧКИ...</span>
             </>
           ) : (
             <>
-              <span>СОЗДАТЬ КАРТОЧКУ ANKI</span>
-              <span className="text-xs font-black tracking-normal px-2 py-0.5 rounded-full bg-black/10">
+              <span className="truncate">СОЗДАТЬ КАРТОЧКУ ANKI</span>
+              <span className="hidden sm:inline text-xs font-black tracking-normal px-2 py-0.5 rounded-full bg-black/10">
                 Enter ↵
               </span>
-              <Check className="w-5 h-5 stroke-[3]" />
+              <Check className="w-4 h-4 sm:w-5 sm:h-5 stroke-[3] shrink-0" />
             </>
           )}
         </button>

@@ -305,52 +305,36 @@ export async function detectAnkiModelAndFields(settings: AnkiSettings): Promise<
 }
 
 /**
- * Format rich HTML for Front and Back fields
+ * Format rich HTML for Front and Back fields matching user's exact Anki card template
  */
 export function formatCardFrontHtml(card: WordCard): string {
-  return `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 20px;">
-  <div style="font-size: 28px; font-weight: 700; color: #2563eb; letter-spacing: -0.02em;">${escapeHtml(card.original)}</div>
-  ${card.transcription ? `<div style="font-size: 18px; color: #64748b; margin-top: 6px; font-style: italic;">${escapeHtml(card.transcription)}</div>` : ""}
-  ${card.partOfSpeech ? `<div style="display: inline-block; font-size: 13px; color: #475569; background-color: #f1f5f9; padding: 3px 10px; border-radius: 9999px; margin-top: 10px; border: 1px solid #e2e8f0;">${escapeHtml(card.partOfSpeech)}</div>` : ""}
+  const exampleHtml = card.exampleEn
+    ? `\n  <div style="margin-top: 18px; padding: 12px; background-color: #eff6ff; border-radius: 8px; border: 1px solid #bfdbfe; text-align: left;">\n    <div style="font-size: 16px; color: #1d4ed8; font-weight: 500;">${escapeHtml(card.exampleEn)}</div>\n  </div>`
+    : "";
+
+  const transcriptionHtml = card.transcription
+    ? `\n  <div style="font-size: 18px; color: #64748b; margin-top: 6px; font-style: italic;">${escapeHtml(card.transcription)}</div>`
+    : "";
+
+  return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 20px;">
+  <div style="font-size: 28px; font-weight: 700; color: #2563eb; letter-spacing: -0.02em;">${escapeHtml(card.original)}</div>${transcriptionHtml}${exampleHtml}
 </div>`.trim();
 }
 
 export function formatCardBackHtml(card: WordCard, dictionaryName?: string): string {
-  const alternativesHtml =
-    card.alternatives && card.alternatives.length > 0
-      ? `<div style="font-size: 14px; color: #64748b; margin-top: 6px;">Синонимы / варианты: <span style="color: #334155;">${card.alternatives.map(escapeHtml).join(", ")}</span></div>`
-      : "";
+  const dictName = dictionaryName || "Общий словарь";
 
-  const definitionHtml = card.definition
-    ? `<div style="font-size: 14px; color: #475569; margin-top: 10px; background-color: #f8fafc; padding: 8px 12px; border-radius: 8px; border-left: 3px solid #6366f1; text-align: left;">${escapeHtml(card.definition)}</div>`
-    : "";
-
-  const exampleHtml = card.exampleEn
-    ? `<div style="margin-top: 14px; padding: 12px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; text-align: left;">
-        <div style="font-size: 15px; color: #166534; font-weight: 500;">${escapeHtml(card.exampleEn)}</div>
-        ${card.exampleRu ? `<div style="font-size: 13px; color: #15803d; margin-top: 4px;">${escapeHtml(card.exampleRu)}</div>` : ""}
-      </div>`
+  const exampleRuHtml = card.exampleRu
+    ? `\n  <div style="margin-top: 14px; padding: 12px; background-color: #f0fdf4; border-radius: 8px; border: 1px solid #bbf7d0; text-align: left;">\n    <div style="font-size: 15px; color: #166534; font-weight: 500;">${escapeHtml(card.exampleRu)}</div>\n  </div>`
     : "";
 
   const mnemonicHtml = card.mnemonic
-    ? `<div style="margin-top: 10px; padding: 8px 12px; background-color: #fefce8; border-radius: 8px; border: 1px solid #fef08a; font-size: 13px; color: #854d0e; text-align: left;">
-        💡 <strong>Мнемоника:</strong> ${escapeHtml(card.mnemonic)}
-      </div>`
+    ? `\n  <div style="margin-top: 10px; padding: 8px 12px; background-color: #fefce8; border-radius: 8px; border: 1px solid #fef08a; font-size: 13px; color: #854d0e; text-align: left;">💡 <strong>Мнемоника:</strong> ${escapeHtml(card.mnemonic)}</div>`
     : "";
 
-  const footerHtml = dictionaryName
-    ? `<div style="margin-top: 12px; font-size: 12px; color: #94a3b8; text-align: right;">Словарь: ${escapeHtml(dictionaryName)}</div>`
-    : "";
-
-  return `
-<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 10px 20px;">
-  <div style="font-size: 24px; font-weight: 700; color: #059669; letter-spacing: -0.01em;">${escapeHtml(card.translation)}</div>
-  ${alternativesHtml}
-  ${definitionHtml}
-  ${exampleHtml}
-  ${mnemonicHtml}
-  ${footerHtml}
+  return `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; text-align: center; padding: 10px 20px;">
+  <div style="font-size: 24px; font-weight: 700; color: #059669; letter-spacing: -0.01em;">${escapeHtml(card.translation)}</div>${exampleRuHtml}${mnemonicHtml}
+  <div style="margin-top: 12px; font-size: 12px; color: #94a3b8; text-align: right;">Словарь: ${escapeHtml(dictName)}</div>
 </div>`.trim();
 }
 

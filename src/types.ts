@@ -11,6 +11,7 @@ export interface WordCard {
   mnemonic?: string;
   tags: string[];
   dictionaryId: string;
+  guid?: string;
   ankiStatus: 'not_added' | 'synced' | 'error';
   ankiNoteId?: number;
   ankiError?: string;

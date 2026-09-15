@@ -323,12 +323,12 @@ export const WordList: React.FC<WordListProps> = ({
 
                   {/* Example */}
                   {card.exampleEn && (
-                    <div className="mt-2 text-xs p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700/80">
-                      <p className="font-semibold text-slate-900 dark:text-slate-100 text-xs sm:text-[13px] leading-relaxed">
+                    <div className="mt-2 text-xs p-2.5 rounded-xl bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900/50">
+                      <p className="font-semibold text-blue-700 dark:text-blue-300 text-xs sm:text-[13px] leading-relaxed">
                         {card.exampleEn}
                       </p>
                       {card.exampleRu && (
-                        <p className="text-slate-700 dark:text-slate-300 text-xs mt-1 leading-relaxed">
+                        <p className="text-emerald-700 dark:text-emerald-400 text-xs mt-1.5 pt-1.5 border-t border-blue-100 dark:border-blue-900/40 leading-relaxed font-medium">
                           {card.exampleRu}
                         </p>
                       )}

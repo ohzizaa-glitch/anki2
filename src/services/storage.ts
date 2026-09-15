@@ -1,4 +1,16 @@
 import { AnkiSettings, Dictionary, WordCard } from "../types";
+import { formatCardFrontHtml, formatCardBackHtml } from "./ankiConnect";
+
+const ANKI_GUID_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%&()*+,-./:;<=>?@[]^_`{|}~";
+
+export function generateAnkiGuid(): string {
+  let guid = "";
+  for (let i = 0; i < 10; i++) {
+    const idx = Math.floor(Math.random() * ANKI_GUID_CHARS.length);
+    guid += ANKI_GUID_CHARS[idx];
+  }
+  return guid;
+}
 
 const STORAGE_KEYS = {
   WORDS: "anki_app_words_v1",
@@ -267,36 +279,33 @@ export function exportCardsToCsv(cards: WordCard[], dictionaries: Dictionary[]):
 }
 
 /**
- * Anki-friendly Tab-Separated Values (TSV) export ready for Anki "File -> Import"
+ * Anki-friendly Tab-Separated Values (TSV/TXT) export matching user's exact template
  */
 export function exportAnkiTsv(cards: WordCard[], dictionaries: Dictionary[]): void {
   const dictMap = new Map(dictionaries.map((d) => [d.id, d.name]));
 
-  const rows = cards.map((card) => {
-    const dictName = dictMap.get(card.dictionaryId) || "General";
-    // Front: Word, transcription, part of speech
-    const front = `${card.original}${card.transcription ? ` [${card.transcription}]` : ""}${card.partOfSpeech ? ` (${card.partOfSpeech})` : ""}`;
-    // Back: Translation, alternatives, definition, examples, mnemonic
-    const backParts: string[] = [card.translation];
-    if (card.alternatives?.length) {
-      backParts.push(`Синонимы: ${card.alternatives.join(", ")}`);
-    }
-    if (card.definition) {
-      backParts.push(`Определение: ${card.definition}`);
-    }
-    if (card.exampleEn) {
-      backParts.push(`Пример: ${card.exampleEn}${card.exampleRu ? ` — ${card.exampleRu}` : ""}`);
-    }
-    if (card.mnemonic) {
-      backParts.push(`Мнемоника: ${card.mnemonic}`);
-    }
-    const back = backParts.join("<br><br>");
-    const tags = ["anki-cards-creator", dictName.toLowerCase().replace(/\s+/g, "_"), ...(card.tags || [])].join(" ");
+  const headers = [
+    "#separator:Tab",
+    "#html:true",
+    "#notetype:Простая",
+    "#guid column:3",
+    "#columns:Front\tBack\tGUID",
+  ];
 
-    return `${escapeTsvCell(front)}\t${escapeTsvCell(back)}\t${escapeTsvCell(tags)}`;
+  const rows = cards.map((card) => {
+    const dictName = dictMap.get(card.dictionaryId) || "Общий словарь";
+    const frontHtml = formatCardFrontHtml(card);
+    const backHtml = formatCardBackHtml(card, dictName);
+    const guid = card.guid || generateAnkiGuid();
+
+    // Escape quotes inside HTML cells for TSV
+    const frontEscaped = `"${frontHtml.replace(/"/g, '""')}"`;
+    const backEscaped = `"${backHtml.replace(/"/g, '""')}"`;
+
+    return `${frontEscaped}\t${backEscaped}\t${guid}`;
   });
 
-  const content = "\uFEFF" + rows.join("\r\n");
+  const content = "\uFEFF" + headers.join("\r\n") + "\r\n" + rows.join("\r\n");
   const blob = new Blob([content], { type: "text/tab-separated-values;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

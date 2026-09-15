@@ -180,71 +180,67 @@ export const ReviewModal: React.FC<ReviewModalProps> = ({
                 className="min-h-[260px] bg-slate-50 hover:bg-slate-100/80 dark:bg-slate-800/80 dark:hover:bg-slate-800 border-2 border-dashed border-indigo-200 dark:border-indigo-900/60 rounded-2xl p-6 flex flex-col items-center justify-center text-center cursor-pointer transition shadow-sm select-none"
               >
                 {!isFlipped ? (
-                  // Front Side
-                  <div className="space-y-3">
-                    <span className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white tracking-tight">
-                      {currentCard.original}
-                    </span>
-
-                    {currentCard.transcription && (
-                      <p className="text-sm font-mono text-slate-500 dark:text-slate-400">
-                        {currentCard.transcription}
-                      </p>
-                    )}
-
-                    <div className="pt-2 flex items-center justify-center gap-2">
+                  // Front Side (matching Anki Front)
+                  <div className="w-full max-w-sm space-y-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <span className="text-2xl sm:text-3xl font-extrabold text-blue-600 dark:text-blue-400 tracking-tight">
+                        {currentCard.original}
+                      </span>
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           playEnglishPronunciation(currentCard.original);
                         }}
-                        className="p-2 rounded-full bg-white dark:bg-slate-700 text-indigo-600 dark:text-indigo-400 shadow-sm hover:scale-105 transition"
+                        className="p-1.5 rounded-full bg-blue-50 hover:bg-blue-100 dark:bg-slate-700 text-blue-600 dark:text-blue-400 transition"
                         title="Прослушать произношение"
                       >
-                        <Volume2 className="w-5 h-5" />
+                        <Volume2 className="w-4 h-4" />
                       </button>
                     </div>
 
-                    <p className="text-xs text-slate-400 pt-3">
-                      Нажмите, чтобы увидеть перевод
-                    </p>
-                  </div>
-                ) : (
-                  // Back Side
-                  <div className="space-y-3 animate-in fade-in">
-                    <span className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
-                      {currentCard.translation}
-                    </span>
-
-                    {currentCard.alternatives?.length > 0 && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400">
-                        Варианты: {currentCard.alternatives.join(", ")}
-                      </p>
-                    )}
-
-                    {currentCard.definition && (
-                      <p className="text-xs text-slate-600 dark:text-slate-300 italic max-w-sm mx-auto bg-white/70 dark:bg-slate-900/50 p-2 rounded-lg">
-                        {currentCard.definition}
+                    {currentCard.transcription && (
+                      <p className="text-base font-serif italic text-slate-500 dark:text-slate-400">
+                        {currentCard.transcription}
                       </p>
                     )}
 
                     {currentCard.exampleEn && (
-                      <div className="text-xs p-2.5 rounded-lg bg-emerald-50 dark:bg-emerald-950/30 text-emerald-800 dark:text-emerald-300 max-w-sm mx-auto text-left">
-                        <p className="font-semibold">{currentCard.exampleEn}</p>
-                        {currentCard.exampleRu && (
-                          <p className="text-emerald-700/80 dark:text-emerald-400 text-[11px] mt-0.5">
-                            {currentCard.exampleRu}
-                          </p>
-                        )}
+                      <div className="mt-3 p-3 rounded-xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-900/50 text-left">
+                        <p className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                          {currentCard.exampleEn}
+                        </p>
+                      </div>
+                    )}
+
+                    <p className="text-xs text-slate-400 pt-2">
+                      Нажмите, чтобы увидеть перевод
+                    </p>
+                  </div>
+                ) : (
+                  // Back Side (matching Anki Back)
+                  <div className="w-full max-w-sm space-y-3 animate-in fade-in">
+                    <span className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 tracking-tight">
+                      {currentCard.translation}
+                    </span>
+
+                    {currentCard.exampleRu && (
+                      <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 text-left">
+                        <p className="text-sm font-medium text-emerald-800 dark:text-emerald-300">
+                          {currentCard.exampleRu}
+                        </p>
                       </div>
                     )}
 
                     {currentCard.mnemonic && (
-                      <p className="text-[11px] text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/30 p-2 rounded-lg">
-                        💡 {currentCard.mnemonic}
-                      </p>
+                      <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/50 text-left text-xs text-amber-800 dark:text-amber-300">
+                        💡 <strong>Мнемоника:</strong> {currentCard.mnemonic}
+                      </div>
                     )}
+
+                    <div className="text-[11px] text-slate-400 text-right pt-1">
+                      Словарь: {dictionaries.find((d) => d.id === currentCard.dictionaryId)?.name || "Общий словарь"}
+                    </div>
                   </div>
                 )}
               </div>
