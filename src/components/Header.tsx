@@ -13,8 +13,11 @@ import {
   Layers,
   Flame,
   Cloud,
+  Target,
+  PlusCircle,
 } from "lucide-react";
 import { ThemeMode } from "../types";
+import { NavTab } from "./BottomNavBar";
 
 interface HeaderProps {
   theme: ThemeMode;
@@ -29,6 +32,8 @@ interface HeaderProps {
   user: User | null;
   syncCode?: string;
   onOpenAccount: () => void;
+  activeTab?: NavTab;
+  onSelectTab?: (tab: NavTab) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -44,12 +49,17 @@ export const Header: React.FC<HeaderProps> = ({
   user,
   syncCode,
   onOpenAccount,
+  activeTab,
+  onSelectTab,
 }) => {
   return (
     <header className="sticky top-0 z-30 bg-[#0a1836]/90 backdrop-blur-md border-b border-[#1b3166] text-white transition-colors">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-3">
         {/* Brand Logo & Title */}
-        <div className="flex items-center gap-3">
+        <div
+          className="flex items-center gap-3 cursor-pointer"
+          onClick={() => onSelectTab?.("add")}
+        >
           <div className="w-10 h-10 rounded-2xl bg-[#bef264] flex items-center justify-center text-slate-950 font-black text-lg shadow-md shadow-[#bef264]/20 transform -rotate-3 hover:rotate-0 transition">
             LS
           </div>
@@ -67,6 +77,36 @@ export const Header: React.FC<HeaderProps> = ({
             </p>
           </div>
         </div>
+
+        {/* Desktop Quick Nav Switcher between Generator and Goals */}
+        {onSelectTab && (
+          <div className="hidden md:flex items-center gap-1 bg-slate-950/80 p-1 rounded-full border border-slate-700/60 shadow-inner">
+            <button
+              type="button"
+              onClick={() => onSelectTab("add")}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                activeTab === "add" || activeTab === "record" || activeTab === "decks"
+                  ? "bg-[#bef264] text-slate-950 font-black shadow-sm"
+                  : "text-slate-300 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <PlusCircle className="w-3.5 h-3.5 shrink-0" />
+              <span>Генератор</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onSelectTab("goals")}
+              className={`px-3.5 py-1.5 rounded-full text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                activeTab === "goals"
+                  ? "bg-[#38bdf8] text-slate-950 font-black shadow-sm"
+                  : "text-slate-300 hover:text-white hover:bg-white/10"
+              }`}
+            >
+              <Target className="w-3.5 h-3.5 shrink-0" />
+              <span>Цели и уровни</span>
+            </button>
+          </div>
+        )}
 
         {/* Right Status Badges & Controls */}
         <div className="flex items-center gap-2">

@@ -9,12 +9,13 @@ import {
   exportCardsToCsv,
   exportAnkiTsv,
   parseCardsFromCsv,
+  loadUserGoals,
 } from "./services/storage";
 import {
   addCardToAnki,
   testAnkiConnection,
 } from "./services/ankiConnect";
-import { AnkiSettings, Dictionary, ThemeMode, WordCard } from "./types";
+import { AnkiSettings, Dictionary, ThemeMode, WordCard, UserGoals } from "./types";
 import { User } from "firebase/auth";
 import {
   onAuthChange,
@@ -34,6 +35,7 @@ import { Header } from "./components/Header";
 import { WordInputForm } from "./components/WordInputForm";
 import { RightDecksPanel } from "./components/RightDecksPanel";
 import { BottomNavBar, NavTab } from "./components/BottomNavBar";
+import { GoalsProgressTab } from "./components/GoalsProgressTab";
 import { ReviewModal } from "./components/ReviewModal";
 import { AnkiGuideModal } from "./components/AnkiGuideModal";
 import { AnkiSettingsModal } from "./components/AnkiSettingsModal";
@@ -58,8 +60,11 @@ export default function App() {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
 
-  // Navigation tab state (Add / Decks / Guide / Settings)
+  // Navigation tab state (Add / Decks / Guide / Settings / Goals)
   const [activeTab, setActiveTab] = useState<NavTab>("add");
+
+  // Goals state
+  const [goals, setGoals] = useState<UserGoals>(() => loadUserGoals());
 
   // Core Data
   const [cards, setCards] = useState<WordCard[]>(() => loadStoredCards());
@@ -502,7 +507,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#07132c] text-slate-900 dark:text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] selection:bg-[#bef264] selection:text-slate-950 pb-24 sm:pb-28 lg:pb-28">
+    <div className="min-h-screen bg-[#07132c] text-slate-900 dark:text-slate-100 flex flex-col font-['Plus_Jakarta_Sans',sans-serif] selection:bg-[#bef264] selection:text-slate-950 pb-28 sm:pb-32">
       {/* Top Header */}
       <Header
         theme={theme}
@@ -517,115 +522,127 @@ export default function App() {
         user={user}
         syncCode={syncCode}
         onOpenAccount={() => setIsAccountOpen(true)}
+        activeTab={activeTab}
+        onSelectTab={handleSelectTab}
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-7">
-        {/* Responsive Layout:
-            - On lg screens: Side-by-side Dual Panel matching the reference image!
-            - On smaller screens: Tabbed switching between Left (Add) and Right (Decks/Guide/Cards)
-        */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Panel: LEXISYNC ДОБАВЛЕНИЕ СЛОВ */}
-          <div
-            className={`lg:col-span-5 ${
-              activeTab === "add" || activeTab === "record" ? "block" : "hidden lg:block"
-            }`}
-          >
-            {/* Cloud Sync Status / Phone Pairing Notice */}
-            {syncCode ? (
-              <div className="mb-4 px-3.5 py-2.5 rounded-2xl bg-indigo-950/50 border border-indigo-500/30 text-indigo-200 flex items-center justify-between gap-2 text-xs shadow-md">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-500/30">
-                    <Smartphone className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-bold text-white">Синхронизация активна</span>
-                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 lg:px-8 pt-5 sm:pt-7 pb-24 sm:pb-28">
+        {/* If "goals" tab is selected, render the full visual Goals & Levels dashboard */}
+        {activeTab === "goals" ? (
+          <GoalsProgressTab
+            cards={cards}
+            goals={goals}
+            onUpdateGoals={setGoals}
+            onSwitchToAddTab={() => setActiveTab("add")}
+          />
+        ) : (
+          /* Responsive Layout:
+              - On lg screens: Side-by-side Dual Panel matching the reference image!
+              - On smaller screens: Tabbed switching between Left (Add) and Right (Decks/Guide/Cards)
+          */
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Left Panel: LEXISYNC ДОБАВЛЕНИЕ СЛОВ */}
+            <div
+              className={`lg:col-span-5 ${
+                activeTab === "add" || activeTab === "record" ? "block" : "hidden lg:block"
+              }`}
+            >
+              {/* Cloud Sync Status / Phone Pairing Notice */}
+              {syncCode ? (
+                <div className="mb-4 px-3.5 py-2.5 rounded-2xl bg-indigo-950/50 border border-indigo-500/30 text-indigo-200 flex items-center justify-between gap-2 text-xs shadow-md">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-500/30">
+                      <Smartphone className="w-4 h-4" />
                     </div>
-                    <p className="text-[10px] text-slate-300 truncate">
-                      Код: <strong className="text-white font-mono">{syncCode}</strong> • {cards.length} карточек в облаке
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAccountOpen(true)}
-                  className="px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] shrink-0 transition cursor-pointer"
-                >
-                  Ссылка для тел.
-                </button>
-              </div>
-            ) : (
-              <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-blue-950/70 border border-indigo-500/30 text-white shadow-lg flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-500/30">
-                    <Smartphone className="w-4 h-4" />
-                  </div>
-                  <div className="min-w-0">
-                    <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                      <span>Синхронизация с телефоном</span>
-                      <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.2 bg-[#bef264]/20 text-[#bef264] rounded-sm font-black border border-[#bef264]/30">
-                        FREE
-                      </span>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px] font-bold text-white">Синхронизация активна</span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse shrink-0" />
+                      </div>
+                      <p className="text-[10px] text-slate-300 truncate">
+                        Код: <strong className="text-white font-mono">{syncCode}</strong> • {cards.length} карточек в облаке
+                      </p>
                     </div>
-                    <p className="text-[11px] text-slate-300 truncate">
-                      Добавляйте слова на телефоне — дома скидывайте в Anki!
-                    </p>
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountOpen(true)}
+                    className="px-2.5 py-1 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-[11px] shrink-0 transition cursor-pointer"
+                  >
+                    Ссылка для тел.
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setIsAccountOpen(true)}
-                  className="px-3 py-1.5 rounded-xl bg-[#bef264] hover:bg-[#a3e635] text-slate-950 font-black text-xs shrink-0 transition shadow-sm cursor-pointer"
-                >
-                  Подключить
-                </button>
-              </div>
-            )}
+              ) : (
+                <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-indigo-950/80 to-blue-950/70 border border-indigo-500/30 text-white shadow-lg flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-300 flex items-center justify-center shrink-0 border border-indigo-500/30">
+                      <Smartphone className="w-4 h-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                        <span>Синхронизация с телефоном</span>
+                        <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.2 bg-[#bef264]/20 text-[#bef264] rounded-sm font-black border border-[#bef264]/30">
+                          FREE
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-slate-300 truncate">
+                        Добавляйте слова на телефоне — дома скидывайте в Anki!
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsAccountOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-[#bef264] hover:bg-[#a3e635] text-slate-950 font-black text-xs shrink-0 transition shadow-sm cursor-pointer"
+                  >
+                    Подключить
+                  </button>
+                </div>
+              )}
 
-            <WordInputForm
-              dictionaries={dictionaries}
-              activeDictionaryId={activeDictionaryId === "all" ? dictionaries[0]?.id || "dict_general" : activeDictionaryId}
-              onSelectDictionary={(id) => setActiveDictionaryId(id)}
-              onOpenNewDictModal={() => setIsNewDictOpen(true)}
-              onAddCard={handleAddCard}
-              ankiConnected={ankiConnected}
-              onOpenGuide={() => setIsGuideOpen(true)}
-            />
-          </div>
+              <WordInputForm
+                dictionaries={dictionaries}
+                activeDictionaryId={activeDictionaryId === "all" ? dictionaries[0]?.id || "dict_general" : activeDictionaryId}
+                onSelectDictionary={(id) => setActiveDictionaryId(id)}
+                onOpenNewDictModal={() => setIsNewDictOpen(true)}
+                onAddCard={handleAddCard}
+                ankiConnected={ankiConnected}
+                onOpenGuide={() => setIsGuideOpen(true)}
+              />
+            </div>
 
-          {/* Right Panel: МОИ СЛОВАРИ И ИНСТРУКЦИЯ */}
-          <div
-            className={`lg:col-span-7 ${
-              activeTab === "decks" || activeTab === "guide" || activeTab === "settings"
-                ? "block"
-                : "hidden lg:block"
-            }`}
-          >
-            <RightDecksPanel
-              dictionaries={dictionaries}
-              activeDictionaryId={activeDictionaryId}
-              onSelectDictionary={(id) => setActiveDictionaryId(id)}
-              onOpenNewDictModal={() => setIsNewDictOpen(true)}
-              onDeleteDictionary={handleDeleteDictionary}
-              cards={cards}
-              onDeleteCard={handleDeleteCard}
-              onSyncSingleCard={handleSyncSingleCard}
-              onSyncAllCards={handleSyncAllCards}
-              onExportCsv={handleExportCsv}
-              onExportAnkiTsv={handleExportAnkiTsv}
-              onImportCsv={handleImportCsv}
-              ankiConnected={ankiConnected}
-              onOpenSettings={() => setIsSettingsOpen(true)}
-              onOpenGuideModal={() => setIsGuideOpen(true)}
-              theme={theme}
-              onToggleTheme={toggleTheme}
-              onOpenReview={() => setIsReviewOpen(true)}
-            />
+            {/* Right Panel: МОИ СЛОВАРИ И ИНСТРУКЦИЯ */}
+            <div
+              className={`lg:col-span-7 ${
+                activeTab === "decks" || activeTab === "guide" || activeTab === "settings"
+                  ? "block"
+                  : "hidden lg:block"
+              }`}
+            >
+              <RightDecksPanel
+                dictionaries={dictionaries}
+                activeDictionaryId={activeDictionaryId}
+                onSelectDictionary={(id) => setActiveDictionaryId(id)}
+                onOpenNewDictModal={() => setIsNewDictOpen(true)}
+                onDeleteDictionary={handleDeleteDictionary}
+                cards={cards}
+                onDeleteCard={handleDeleteCard}
+                onSyncSingleCard={handleSyncSingleCard}
+                onSyncAllCards={handleSyncAllCards}
+                onExportCsv={handleExportCsv}
+                onExportAnkiTsv={handleExportAnkiTsv}
+                onImportCsv={handleImportCsv}
+                ankiConnected={ankiConnected}
+                onOpenSettings={() => setIsSettingsOpen(true)}
+                onOpenGuideModal={() => setIsGuideOpen(true)}
+                theme={theme}
+                onToggleTheme={toggleTheme}
+                onOpenReview={() => setIsReviewOpen(true)}
+              />
+            </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* Retro Bottom Navigation Bar (matches reference image tabs) */}

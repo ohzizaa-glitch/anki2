@@ -1,4 +1,4 @@
-import { AnkiSettings, Dictionary, WordCard } from "../types";
+import { AnkiSettings, Dictionary, WordCard, UserGoals, LevelInfo } from "../types";
 import { formatCardFrontHtml, formatCardBackHtml } from "./ankiConnect";
 
 const ANKI_GUID_CHARS = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!#$%&()*+,-./:;<=>?@[]^_`{|}~";
@@ -402,3 +402,123 @@ function parseCsvLine(line: string): string[] {
   result.push(current.trim());
   return result;
 }
+
+// ----------------------------------------------------
+// Goals & CEFR Levels
+// ----------------------------------------------------
+
+export const DEFAULT_GOALS: UserGoals = {
+  totalGoal: 300,
+  dailyGoal: 20,
+  weeklyGoal: 100,
+  selectedLevel: "A0",
+};
+
+export const TOTAL_GOAL_OPTIONS = [300, 800, 1500, 3000, 5000, 8000, 12000];
+export const DAILY_GOAL_OPTIONS = [5, 10, 15, 20, 30, 50, 100];
+export const WEEKLY_GOAL_OPTIONS = [35, 70, 100, 150, 250, 350, 500];
+
+export const CEFR_LEVELS: LevelInfo[] = [
+  { level: "A0", name: "Начальный", min: 0, max: 300, description: "Первые базовые слова и повседневные фразы" },
+  { level: "A1", name: "Элементарный", min: 300, max: 800, description: "Простые диалоги, знакомство, базовые потребности" },
+  { level: "A2", name: "Базовый пользователь", min: 800, max: 1500, description: "Понимание простых текстов, описания ситуаций и планов" },
+  { level: "B1", name: "Средний уровень", min: 1500, max: 3000, description: "Свободное общение на знакомые темы, путешествия, работа" },
+  { level: "B2", name: "Выше среднего", min: 3000, max: 5000, description: "Понимание сложных текстов, фильмов и беглой речи" },
+  { level: "C1", name: "Продвинутый", min: 5000, max: 8000, description: "Беглая спонтанная речь, научные и профессиональные темы" },
+  { level: "C2", name: "Владение в совершенстве", min: 8000, max: 12000, description: "Уровень образованного носителя языка без ограничений" },
+];
+
+export function getUserCurrentLevel(
+  learnedInAppCount: number,
+  manualLevel?: string
+): {
+  currentLevel: LevelInfo;
+  nextLevel: LevelInfo | null;
+  levelIndex: number;
+  wordsInLevel: number;
+  levelSpan: number;
+  progressPercent: number;
+  wordsToNextLevel: number;
+  isCustomLevel: boolean;
+} {
+  let levelIndex = 0;
+
+  if (manualLevel) {
+    const foundIdx = CEFR_LEVELS.findIndex((lvl) => lvl.level.toUpperCase() === manualLevel.toUpperCase());
+    if (foundIdx !== -1) {
+      levelIndex = foundIdx;
+    }
+  } else {
+    for (let i = 0; i < CEFR_LEVELS.length; i++) {
+      if (learnedInAppCount >= CEFR_LEVELS[i].min) {
+        levelIndex = i;
+      }
+    }
+  }
+
+  const currentLevel = CEFR_LEVELS[levelIndex];
+  const nextLevel = levelIndex < CEFR_LEVELS.length - 1 ? CEFR_LEVELS[levelIndex + 1] : null;
+
+  // Words progress specifically within the target stage:
+  // Each level requires a certain span of words to master (e.g., A0->A1 requires 300 words; A1->A2 requires 500 words).
+  const levelSpan = currentLevel.max - currentLevel.min;
+  // Words learned in app applied to current level:
+  const wordsInLevel = Math.min(levelSpan, Math.max(0, learnedInAppCount));
+  const progressPercent = Math.min(100, Math.round((wordsInLevel / levelSpan) * 100));
+  const wordsToNextLevel = Math.max(0, levelSpan - wordsInLevel);
+
+  return {
+    currentLevel,
+    nextLevel,
+    levelIndex,
+    wordsInLevel,
+    levelSpan,
+    progressPercent,
+    wordsToNextLevel,
+    isCustomLevel: Boolean(manualLevel),
+  };
+}
+
+export function getCardsAddedToday(cards: WordCard[]): number {
+  const now = new Date();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  return cards.filter((c) => (c.createdAt || 0) >= startOfDay).length;
+}
+
+export function getCardsAddedThisWeek(cards: WordCard[]): number {
+  const now = new Date();
+  const day = now.getDay();
+  // Monday as 1st day of the week
+  const diff = (day === 0 ? -6 : 1) - day;
+  const monday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + diff);
+  monday.setHours(0, 0, 0, 0);
+  const startOfWeek = monday.getTime();
+  return cards.filter((c) => (c.createdAt || 0) >= startOfWeek).length;
+}
+
+export function loadUserGoals(): UserGoals {
+  try {
+    const raw = localStorage.getItem("anki_app_goals_v1");
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        totalGoal: parsed.totalGoal || DEFAULT_GOALS.totalGoal,
+        dailyGoal: parsed.dailyGoal || DEFAULT_GOALS.dailyGoal,
+        weeklyGoal: parsed.weeklyGoal || DEFAULT_GOALS.weeklyGoal,
+        selectedLevel: parsed.selectedLevel || DEFAULT_GOALS.selectedLevel || "A0",
+      };
+    }
+  } catch (e) {
+    console.error("Failed to load goals from localStorage", e);
+  }
+  return DEFAULT_GOALS;
+}
+
+export function saveUserGoals(goals: UserGoals): void {
+  try {
+    localStorage.setItem("anki_app_goals_v1", JSON.stringify(goals));
+  } catch (e) {
+    console.error("Failed to save goals to localStorage", e);
+  }
+}
+

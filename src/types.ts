@@ -54,4 +54,20 @@ export interface TranslationData {
   tags: string[];
 }
 
+export interface UserGoals {
+  totalGoal: number;
+  dailyGoal: number;
+  weeklyGoal: number;
+  selectedLevel?: string; // e.g. "A0", "A1", "A2", "B1", "B2", "C1", "C2" (manual level choice)
+}
+
+export interface LevelInfo {
+  level: string;
+  name: string;
+  min: number;
+  max: number;
+  description: string;
+}
+
 export type ThemeMode = 'light' | 'dark' | 'system';
+
